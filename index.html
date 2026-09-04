@@ -3,343 +3,392 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>港鐵即時到站時間</title>
+  <title>港鐵即時到站顯示系統</title>
   <style>
-    /* 全局樣式：黑色主題 */
+    /* 全局背景與字型設定 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       background-color: #121212;
       color: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       display: flex;
       justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
       padding: 20px;
-      margin: 0;
     }
 
-    /* 卡片容器 */
-    .card {
-      background-color: #1e1e1e;
-      border-radius: 12px;
-      padding: 20px;
+    /* 主要外框面板 */
+    .card-panel {
+      background-color: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 16px;
+      padding: 24px;
       width: 100%;
-      max-width: 420px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      max-width: 460px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     }
 
-    /* 頂部標題與按鈕 */
-    .card-header {
+    /* 頂部標題區塊 */
+    .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .station-title {
-      font-size: 22px;
-      font-weight: bold;
+      font-size: 24px;
+      font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      letter-spacing: 1px;
     }
 
-    .action-btn {
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn-fav { background-color: #2e7d32; color: white; }
-    .btn-del { background-color: #d32f2f; color: white; }
-
-    /* 路線篩選器 (Filter Bar) */
-    .filter-container {
+    .action-group {
       display: flex;
       gap: 8px;
-      margin-bottom: 16px;
-      border-bottom: 1px dashed #333;
-      padding-bottom: 12px;
     }
 
-    .filter-btn {
-      background-color: #2c2c2c;
-      color: #888;
+    .btn-action {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .btn-action:hover {
+      opacity: 0.85;
+    }
+
+    .btn-fav {
+      background-color: #2e7d32;
+      color: #ffffff;
+    }
+
+    .btn-del {
+      background-color: #d32f2f;
+      color: #ffffff;
+    }
+
+    /* 路線選擇按鈕區 */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px dashed #333333;
+    }
+
+    .btn-filter {
+      background-color: #2a2a2a;
+      color: #999999;
       border: none;
       border-radius: 20px;
-      padding: 6px 14px;
+      padding: 8px 16px;
       font-size: 14px;
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
-    .filter-btn.active {
-      background-color: #444;
-      color: #fff;
+    .btn-filter.active {
+      background-color: #444444;
+      color: #ffffff;
     }
 
-    /* 列車清單列表 */
+    /* 班次列表 */
     .train-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
-    .train-row {
+    .train-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 16px;
-      font-weight: 500;
+      font-size: 17px;
+      font-weight: 600;
+      padding: 2px 0;
     }
 
-    .train-info-left {
+    .item-left {
       display: flex;
       align-items: center;
       gap: 12px;
     }
 
-    /* 路線 Badge 樣式 */
-    .line-tag {
-      padding: 3px 8px;
+    /* 路線彩色標籤 */
+    .line-badge {
+      padding: 4px 10px;
       border-radius: 6px;
       font-size: 13px;
       font-weight: bold;
-      min-width: 65px;
+      color: #ffffff;
+      min-width: 72px;
       text-align: center;
-      color: white;
     }
-    .line-tag.KTL { background-color: #00AF41; } /* 觀塘線 綠色 */
-    .line-tag.TKL { background-color: #7D499D; } /* 將軍澳線 紫色 */
-    .line-tag.ISL { background-color: #007DC5; } /* 港島線 藍色 */
-    .line-tag.TWL { background-color: #E60012; } /* 荃灣線 紅色 */
 
-    /* 月台數字圖標 (藍底圓圈) */
+    .line-badge.KTL { background-color: #00AF41; } /* 觀塘線 綠色 */
+    .line-badge.TKL { background-color: #7D499D; } /* 將軍澳線 紫色 */
+    .line-badge.ISL { background-color: #007DC5; } /* 港島線 藍色 */
+
+    /* 月台數字圖標 */
     .platform-badge {
       background-color: #1976D2;
-      color: white;
+      color: #ffffff;
       border-radius: 50%;
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: bold;
     }
 
-    /* 車站名稱 */
+    /* 目的地中文名稱 */
     .dest-name {
       color: #ffffff;
-      font-size: 17px;
+      font-size: 18px;
     }
 
-    /* 到達時間 */
-    .time-text {
+    /* 到達時間顯示 */
+    .time-status {
+      font-size: 16px;
       font-weight: bold;
-      color: #2e7d32; /* 綠色數字 */
-    }
-    .time-text.arriving {
-      color: #ff9800; /* 即將抵達 橙色 */
+      color: #00e676; /* 正常時間綠色 */
     }
 
-    /* 載入中狀態 */
-    .loading {
+    .time-status.arriving {
+      color: #ff9100; /* 即將抵達橙色 */
+    }
+
+    /* 狀態提示 */
+    .status-msg {
       text-align: center;
-      color: #888;
-      padding: 20px 0;
+      color: #888888;
+      padding: 30px 0;
+      font-size: 15px;
     }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="card-header">
+  <div class="card-panel">
+    <!-- 車站標題列 -->
+    <div class="header">
       <div class="station-title">
         <span>🚄</span>
-        <span id="station-name-display">載入中...</span>
+        <span id="station-title-text">調景嶺站</span>
       </div>
-      <div>
-        <button class="action-btn btn-fav">收藏</button>
-        <button class="action-btn btn-del">刪除</button>
+      <div class="action-group">
+        <button class="btn-action btn-fav">收藏</button>
+        <button class="btn-action btn-del">刪除</button>
       </div>
     </div>
 
-    <!-- 動態篩選按鈕區塊 -->
-    <div class="filter-container" id="filter-container"></div>
+    <!-- 路線切換按鈕區 -->
+    <div class="filter-bar" id="filter-bar"></div>
 
-    <!-- 列車資料清單 -->
+    <!-- 即時列車動態清單 -->
     <div class="train-list" id="train-list">
-      <div class="loading">正在擷取即時班次數據...</div>
+      <div class="status-msg">正在連線至港鐵資料庫...</div>
     </div>
   </div>
 
   <script>
-    // 1. 車站與路線全中文對照字典 (已覆蓋將軍澳線全線及常見轉車站)
+    // ==========================================
+    // 1. 車站與路線全中文資料庫 (防止英文代號)
+    // ==========================================
     const LINE_NAMES = {
       TKL: '將軍澳線',
       KTL: '觀塘線',
-      ISL: '港島線',
-      TWL: '荃灣線'
+      ISL: '港島線'
     };
 
     const STATIONS = {
-      // 轉車站（宣告多條路線）
+      // 轉車站
       TIK: { name: '調景嶺', lines: ['TKL', 'KTL'] },
       YAT: { name: '油塘', lines: ['TKL', 'KTL'] },
       NOP: { name: '北角', lines: ['TKL', 'ISL'] },
       QUB: { name: '鰂魚涌', lines: ['TKL', 'ISL'] },
       
-      // 將軍澳線
+      // 將軍澳線其他車站
       TKO: { name: '將軍澳', lines: ['TKL'] },
       LHP: { name: '康城', lines: ['TKL'] },
       POA: { name: '寶琳', lines: ['TKL'] },
       HAH: { name: '坑口', lines: ['TKL'] },
 
-      // 觀塘線/其他常見端點與轉車站中文名稱映射
+      // 觀塘線常見終點/途經車站
       WHA: { name: '黃埔', lines: ['KTL'] },
       HOM: { name: '何文田', lines: ['KTL'] },
       YMT: { name: '油麻地', lines: ['KTL'] },
       MON: { name: '旺角', lines: ['KTL'] },
       PRE: { name: '太子', lines: ['KTL'] },
-      KWT: { name: '觀塘', lines: ['KTL'] },
-      CEN: { name: '中環', lines: ['TWL', 'ISL'] },
-      ADM: { name: '金鐘', lines: ['TWL', 'ISL'] },
-      TST: { name: '尖沙咀', lines: ['TWL'] }
+      KWT: { name: '觀塘', lines: ['KTL'] }
     };
 
-    // 當前選取的車站 (可改為 'LHP' 測試康城，或 'TIK' 測試調景嶺)
-    const currentStationCode = 'TIK';
-    let currentFilter = 'ALL';
-    let rawTrainData = [];
+    // 預設查詢車站 (可更改為 'LHP' 測試康城站，或 'TIK' 測試調景嶺站)
+    let currentStationCode = 'TIK';
+    let currentSelectedLine = 'ALL';
+    let masterTrainData = [];
 
-    // 2. API 抓取邏輯 (解決康城站無數據與多路線合併問題)
-    async function fetchMTRData(stationCode) {
+    // ==========================================
+    // 2. API 資料抓取與處理 (確保康城站與多路線完整)
+    // ==========================================
+    async function fetchStationData(stationCode) {
       const station = STATIONS[stationCode];
       if (!station) return [];
 
-      let allSchedules = [];
+      let fetchedList = [];
 
-      // 針對該車站擁有的所有路線進行查詢
+      // 同時讀取該車站對應的所有路線 API
       for (const lineCode of station.lines) {
-        const url = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${lineCode}&sta=${stationCode}`;
+        const apiUrl = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${lineCode}&sta=${stationCode}`;
         
         try {
-          const response = await fetch(url);
-          const result = await response.json();
+          const response = await fetch(apiUrl);
+          const json = await response.json();
 
-          if (result.status === 1 && result.data[`${lineCode}-${stationCode}`]) {
-            const dataObj = result.data[`${lineCode}-${stationCode}`];
+          if (json.status === 1 && json.data && json.data[`${lineCode}-${stationCode}`]) {
+            const scheduleGroup = json.data[`${lineCode}-${stationCode}`];
 
-            // 同時讀取 UP (上行) 及 DOWN (下行)，避免康城站等單向端點資料遺漏
+            // 讀取 UP (上行) 和 DOWN (下行)，防止康城站等端點站遺漏
             ['UP', 'DOWN'].forEach(dir => {
-              if (Array.isArray(dataObj[dir])) {
-                dataObj[dir].forEach(train => {
-                  allSchedules.push({
+              if (Array.isArray(scheduleGroup[dir])) {
+                scheduleGroup[dir].forEach(item => {
+                  // 強制將目的地的英文代號轉換成中文名稱
+                  const destChinese = STATIONS[item.dest] ? STATIONS[item.dest].name : item.dest;
+                  const minutesLeft = parseInt(item.ttnt, 10);
+
+                  fetchedList.push({
                     lineCode: lineCode,
                     lineName: LINE_NAMES[lineCode] || lineCode,
-                    plat: train.plat,
-                    // 中文站名轉換：若字典不存在則備用顯示原始代碼
-                    destName: STATIONS[train.dest] ? STATIONS[train.dest].name : train.dest,
-                    ttnt: parseInt(train.ttnt, 10),
-                    timeText: (train.ttnt === '0' || train.ttnt === '1') ? '即將抵達' : `${train.ttnt} 分鐘`
+                    platform: item.plat,
+                    destination: destChinese,
+                    minutes: minutesLeft,
+                    displayText: (minutesLeft <= 1) ? '即將抵達' : `${minutesLeft} 分鐘`
                   });
                 });
               }
             });
           }
         } catch (err) {
-          console.error(`讀取 ${lineCode}-${stationCode} 失敗:`, err);
+          console.error(`抓取 API 失敗 (${lineCode}-${stationCode}):`, err);
         }
       }
 
-      // 按照到達剩餘時間（分鐘）從小到大排序
-      allSchedules.sort((a, b) => a.ttnt - b.ttnt);
-      return allSchedules;
+      // 依剩餘時間排序（由近至遠）
+      fetchedList.sort((a, b) => a.minutes - b.minutes);
+      return fetchedList;
     }
 
-    // 3. 渲染轉車站動態按鈕
-    function renderFilterButtons(stationCode) {
-      const station = STATIONS[stationCode];
-      const filterContainer = document.getElementById('filter-container');
-      filterContainer.innerHTML = '';
+    // ==========================================
+    // 3. UI 渲染邏輯 (動態按鈕與列車清單)
+    // ==========================================
 
-      // 如果該站只有 1 條路線，隱藏篩選列
+    // 渲染轉車站的切換按鈕
+    function renderFilterBar(stationCode) {
+      const station = STATIONS[stationCode];
+      const filterBar = document.getElementById('filter-bar');
+      filterBar.innerHTML = '';
+
+      // 非轉車站不顯示篩選列
       if (station.lines.length <= 1) return;
 
-      // 1. 全部路線按鈕
-      const allBtn = document.createElement('button');
-      allBtn.className = `filter-btn ${currentFilter === 'ALL' ? 'active' : ''}`;
-      allBtn.innerText = '全部路線';
-      allBtn.onclick = () => {
-        currentFilter = 'ALL';
-        updateUI();
+      // 「全部路線」按鈕
+      const btnAll = document.createElement('button');
+      btnAll.className = `btn-filter ${currentSelectedLine === 'ALL' ? 'active' : ''}`;
+      btnAll.innerText = '全部路線';
+      btnAll.onclick = () => {
+        currentSelectedLine = 'ALL';
+        renderTrainList();
       };
-      filterContainer.appendChild(allBtn);
+      filterBar.appendChild(btnAll);
 
-      // 2. 個別路線按鈕 (例如: 將軍澳線, 觀塘線)
+      // 各自路線按鈕
       station.lines.forEach(lineCode => {
-        const btn = document.createElement('button');
-        btn.className = `filter-btn ${currentFilter === lineCode ? 'active' : ''}`;
-        btn.innerText = LINE_NAMES[lineCode] || lineCode;
-        btn.onclick = () => {
-          currentFilter = lineCode;
-          updateUI();
+        const btnLine = document.createElement('button');
+        btnLine.className = `btn-filter ${currentSelectedLine === lineCode ? 'active' : ''}`;
+        btnLine.innerText = LINE_NAMES[lineCode] || lineCode;
+        btnLine.onclick = () => {
+          currentSelectedLine = lineCode;
+          renderTrainList();
         };
-        filterContainer.appendChild(btn);
+        filterBar.appendChild(btnLine);
       });
     }
 
-    // 4. 更新 UI 介面
-    function updateUI() {
-      // 更新按鈕 active 狀態
-      renderFilterButtons(currentStationCode);
+    // 渲染列車清單內容
+    function renderTrainList() {
+      // 重新整理按鈕亮燈狀態
+      renderFilterBar(currentStationCode);
 
-      // 篩選資料
-      const filteredData = rawTrainData.filter(item => {
-        if (currentFilter === 'ALL') return true;
-        return item.lineCode === currentFilter;
+      // 過濾數據
+      const displayData = masterTrainData.filter(item => {
+        if (currentSelectedLine === 'ALL') return true;
+        return item.lineCode === currentSelectedLine;
       });
 
       const listContainer = document.getElementById('train-list');
       listContainer.innerHTML = '';
 
-      if (filteredData.length === 0) {
-        listContainer.innerHTML = '<div class="loading">現時沒有相關班次資料</div>';
+      if (displayData.length === 0) {
+        listContainer.innerHTML = '<div class="status-msg">現時沒有班次資料</div>';
         return;
       }
 
-      // 繪製列表
-      filteredData.forEach(train => {
+      // 產生每行資料
+      displayData.forEach(train => {
         const row = document.createElement('div');
-        row.className = 'train-row';
+        row.className = 'train-item';
 
-        const isArriving = train.ttnt <= 1;
+        const isArriving = train.minutes <= 1;
 
         row.innerHTML = `
-          <div class="train-info-left">
-            <span class="line-tag ${train.lineCode}">${train.lineName}</span>
-            <span class="platform-badge">${train.plat}</span>
-            <span class="dest-name">${train.destName}</span>
+          <div class="item-left">
+            <span class="line-badge ${train.lineCode}">${train.lineName}</span>
+            <span class="platform-badge">${train.platform}</span>
+            <span class="dest-name">${train.destination}</span>
           </div>
-          <div class="time-text ${isArriving ? 'arriving' : ''}">${train.timeText}</div>
+          <div class="time-status ${isArriving ? 'arriving' : ''}">${train.displayText}</div>
         `;
+
         listContainer.appendChild(row);
       });
     }
 
-    // 5. 初始化執行
-    async function init() {
+    // ==========================================
+    // 4. 系統初始化與自動更新
+    // ==========================================
+    async function initApp() {
       const station = STATIONS[currentStationCode];
-      document.getElementById('station-name-display').innerText = `${station.name}站`;
+      document.getElementById('station-title-text').innerText = `${station.name}站`;
 
-      // 抓取 API 資料並渲染
-      rawTrainData = await fetchMTRData(currentStationCode);
-      updateUI();
+      // 載入資料並繪製 UI
+      masterTrainData = await fetchStationData(currentStationCode);
+      renderTrainList();
     }
 
-    init();
+    // 啟動程式
+    initApp();
+
+    // 每 20 秒自動重新抓取最新班次
+    setInterval(async () => {
+      masterTrainData = await fetchStationStationData(currentStationCode);
+      renderTrainList();
+    }, 20000);
   </script>
 </body>
 </html>
