@@ -23,7 +23,6 @@
         }
     </script>
     <style>
-        /* iPhone Safe Area & Touch Adaptive */
         body {
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
@@ -32,13 +31,9 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
-
-        /* Prevent iOS input zoom */
         input, select, button {
             font-size: 16px !important;
         }
-
-        /* Custom Scrollbars */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -56,14 +51,6 @@
         ::-webkit-scrollbar-thumb {
             background: #475569;
             border-radius: 4px;
-        }
-
-        .spin-custom {
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -126,6 +113,20 @@
                 </div>
             </div>
 
+            <!-- MTR Refresh Bar -->
+            <div id="mtrNavActions" class="flex items-center justify-between pt-1 border-t border-slate-800/80 hidden">
+                <span class="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-train-subway"></i>
+                    <span>港鐵即時班次預報</span>
+                </span>
+                <div class="flex items-center gap-1 text-[10px] text-slate-400 shrink-0">
+                    <span id="mtrRefreshTime" class="font-mono">--:--:--</span>
+                    <button onclick="fetchMtrETA()" class="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                        <i id="mtrRefreshIcon" class="fa-solid fa-rotate-right text-[11px]"></i>
+                    </button>
+                </div>
+            </div>
+
         </header>
 
         <!-- Main Content View Container -->
@@ -133,8 +134,6 @@
 
             <!-- BUS VIEW CONTAINER -->
             <div id="busViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-                
-                <!-- Active Bus Stop Header Card -->
                 <div id="activeStopCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col gap-1.5 shrink-0">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 overflow-hidden">
@@ -142,8 +141,6 @@
                             <span id="displayRouteSeq" class="hidden">路線 --</span>
                             <p id="displayBoundInfo" class="text-xs sm:text-sm font-bold text-indigo-400 truncate">請點擊上方的搜尋或 GPS 按鈕</p>
                         </div>
-                        
-                        <!-- Quick Action Buttons -->
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button id="favBtn" onclick="toggleFavorite()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 transition text-xs">
                                 <i id="favIcon" class="fa-regular fa-star text-xs"></i>
@@ -155,13 +152,11 @@
                             </button>
                         </div>
                     </div>
-
                     <h2 id="displayStopName" class="text-xl sm:text-2xl font-black text-slate-100 tracking-tight truncate">
                         尚未選擇車站
                     </h2>
                 </div>
 
-                <!-- Real-time ETA Arrivals List -->
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 shrink-0">
                         <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
@@ -170,7 +165,6 @@
                         </h3>
                         <span class="text-[10px] text-slate-500">數據源: data.gov.hk</span>
                     </div>
-
                     <div id="etaListContainer" class="flex-1 flex flex-col justify-start gap-2 overflow-y-auto no-scrollbar py-0.5">
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-bus text-3xl mb-2 block text-slate-700"></i>
@@ -178,14 +172,54 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
-            <!-- MTR VIEW CONTAINER (PLACEHOLDER FOR FUTURE DEVELOPMENT) -->
-            <div id="mtrViewContainer" class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center hidden">
-                <i class="fa-solid fa-train-subway text-5xl mb-4 text-purple-500"></i>
-                <h2 class="text-lg font-bold text-slate-200 mb-2">港鐵 MTR 到站預報模式</h2>
-                <p class="text-xs text-slate-400 max-w-xs">港鐵列車即時到站數據模組正在整合中，將於下一階段推出...</p>
+            <!-- MTR VIEW CONTAINER -->
+            <div id="mtrViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden hidden">
+                <!-- Selection Controls -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col gap-2 shrink-0">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-1">選擇路線：</label>
+                            <select id="mtrLineSelect" onchange="onMtrLineChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 text-xs font-bold">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-1">選擇車站：</label>
+                            <select id="mtrStationSelect" onchange="onMtrStationChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 text-xs font-bold">
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Panel (Matching Screenshot Format) -->
+                <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
+                    
+                    <!-- Station Name & Favorite Button -->
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 mb-2.5 shrink-0">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-train-subway text-indigo-400 text-lg"></i>
+                            <h2 id="mtrDisplayStationName" class="text-lg font-black text-white">請先選擇車站</h2>
+                        </div>
+                        <div id="mtrFavActionArea" class="flex items-center gap-1.5 hidden">
+                            <button id="mtrFavBtn" onclick="toggleMtrFavorite()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-3 py-1 rounded-lg text-xs transition">
+                                收藏
+                            </button>
+                            <button id="mtrDelBtn" onclick="deleteMtrFavorite()" class="bg-rose-600 hover:bg-rose-700 text-white font-black px-3 py-1 rounded-lg text-xs transition hidden">
+                                刪除
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Train Arrival List -->
+                    <div id="mtrEtaListContainer" class="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar py-1">
+                        <div class="text-center py-10 text-slate-500">
+                            <i class="fa-solid fa-train-subway text-3xl mb-2 block text-slate-700"></i>
+                            <p class="text-xs">請選擇路線及車站以獲取即時列車班次</p>
+                        </div>
+                    </div>
+
+                </div>
             </div>
 
         </main>
@@ -198,7 +232,6 @@
                     <span>我的收藏車站</span>
                 </h3>
             </div>
-
             <div id="favoritesSection" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth">
                 <div class="text-slate-500 text-xs py-1 px-1">
                     未有收藏，查詢車站時點擊「收藏」即可儲存
@@ -208,10 +241,9 @@
 
     </div>
 
-    <!-- Bus Search Modal Window -->
+    <!-- Modals (Bus Search, Change Stop, Gemini AI, GPS Search) -->
     <div id="busSearchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
-            
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
                     <i class="fa-solid fa-route text-indigo-400"></i>
@@ -221,7 +253,6 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
             <div class="p-3.5 space-y-3 overflow-y-auto flex-1">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">巴士公司：</label>
@@ -230,52 +261,42 @@
                         <option value="ctb">城巴 (Citybus - CTB)</option>
                     </select>
                 </div>
-
                 <div class="relative">
                     <label class="block text-xs font-semibold text-slate-300 mb-1">選擇或輸入路線號碼：</label>
                     <div class="relative">
                         <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, A11)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-indigo-500 text-sm" />
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
                     </div>
-
                     <div id="routeAutocompleteDropdown" class="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-56 overflow-y-auto shadow-2xl z-50 hidden"></div>
                 </div>
-
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">行車方向：</label>
                     <select id="modalBoundSelect" onchange="onBoundChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 text-xs">
                         <option value="">-- 請先選擇路線 --</option>
                     </select>
                 </div>
-
                 <div class="border-t border-slate-800 pt-2.5">
                     <label id="modalStopHeaderCount" class="block text-xs font-semibold text-slate-300 mb-1">
                         該路線全線所有停靠站點：
                     </label>
-
                     <select id="modalStopSelect" onchange="onStopDropdownChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 mb-2 focus:outline-none focus:border-indigo-500 text-xs">
                         <option value="">-- 請先選擇路線與行車方向 --</option>
                     </select>
-
                     <div id="modalStopList" class="bg-slate-950 border border-slate-800 rounded-xl p-2 max-h-40 overflow-y-auto space-y-1">
                         <p class="text-xs text-slate-500 text-center py-3">請先選擇路線與方向</p>
                     </div>
                 </div>
             </div>
-
             <div class="p-2.5 border-t border-slate-800 bg-slate-950 flex justify-end">
                 <button onclick="closeSearchModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl transition text-xs">
                     關閉
                 </button>
             </div>
-
         </div>
     </div>
 
-    <!-- Change Station Dialog -->
     <div id="changeStopModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[75vh]">
-            
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <div>
                     <h3 class="text-sm font-bold text-slate-100">更改車站</h3>
@@ -285,33 +306,26 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
             <div class="p-3 space-y-2.5 overflow-y-auto flex-1">
                 <div class="relative">
                     <input type="text" id="changeStopSearchInput" oninput="filterChangeStops()" placeholder="搜尋本線車站名稱..." class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 pl-8 focus:outline-none focus:border-indigo-500 text-xs" />
                     <i class="fa-solid fa-filter absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
                 </div>
-
                 <div>
                     <select id="changeStopSelect" onchange="onQuickChangeStopSelect()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 text-xs"></select>
                 </div>
-
                 <div id="changeStopListContainer" class="bg-slate-950 border border-slate-800 rounded-xl p-2 max-h-52 overflow-y-auto space-y-1"></div>
             </div>
-
             <div class="p-2.5 border-t border-slate-800 bg-slate-950">
                 <button onclick="closeChangeStopModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl transition text-xs">
                     取消
                 </button>
             </div>
-
         </div>
     </div>
 
-    <!-- Gemini AI Assistant Modal -->
     <div id="aiAssistantModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
-            
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
@@ -331,35 +345,28 @@
                     </button>
                 </div>
             </div>
-
-            <!-- API Key Input Panel -->
             <div id="apiKeyPanel" class="bg-slate-950 p-2.5 border-b border-slate-800 hidden">
                 <div class="flex items-center gap-2">
                     <input type="password" id="geminiApiKeyInput" placeholder="請輸入 Gemini API Key (AIzaSy...)" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500" />
                     <button onclick="saveApiKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition">儲存</button>
                 </div>
             </div>
-
             <div id="aiChatBox" class="p-3 overflow-y-auto flex-1 space-y-2.5 bg-slate-950/50">
                 <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
                     你好！我是由真實 Gemini AI 驅動的香港交通助手 🤖。<br>你可以問我關於任何香港巴士路線、轉乘優惠、或推薦最快前往目的地的方法！
                 </div>
             </div>
-
             <div class="p-2 border-t border-slate-800 bg-slate-950 flex gap-2">
                 <input type="text" id="aiInput" placeholder="詢問路線、過海、轉乘方案..." onkeydown="if(event.key==='Enter') sendAiMessage()" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-indigo-500" />
                 <button onclick="sendAiMessage()" id="aiSendBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 rounded-xl transition text-xs flex items-center justify-center">
                     <i class="fa-solid fa-paper-plane" id="aiSendIcon"></i>
                 </button>
             </div>
-
         </div>
     </div>
 
-    <!-- GPS Nearby Bus Search Modal Window -->
     <div id="gpsSearchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
-            
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-xl bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
@@ -374,7 +381,6 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
             <div class="p-2.5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between gap-2 shrink-0">
                 <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
                     <span class="text-[10px] text-slate-400 font-semibold mr-0.5 shrink-0">距離:</span>
@@ -389,26 +395,141 @@
                     <span>刷新</span>
                 </button>
             </div>
-
             <div id="gpsResultsContainer" class="p-2.5 overflow-y-auto flex-1 space-y-2 bg-slate-950/40">
                 <div class="text-center py-10 text-slate-500">
                     <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-emerald-400 block"></i>
                     <p class="text-xs">正在定位及搜尋附近巴士路線...</p>
                 </div>
             </div>
-
             <div class="p-2.5 border-t border-slate-800 bg-slate-950 shrink-0">
                 <button onclick="closeGpsSearchModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl transition text-xs">
                     關閉
                 </button>
             </div>
-
         </div>
     </div>
 
     <script>
+        // MTR Complete Lines and Stations Dataset
+        const mtrData = {
+            "KTL": {
+                name: "觀塘綫",
+                stations: [
+                    { code: "WHA", name: "黃埔" }, { code: "HOM", name: "何文田" }, { code: "YMT", name: "油麻地" },
+                    { code: "MOK", name: "旺角" }, { code: "PRE", name: "太子" }, { code: "SKM", name: "石硤尾" },
+                    { code: "KOT", name: "九龍塘" }, { code: "LOF", name: "樂富" }, { code: "WTS", name: "黃大仙" },
+                    { code: "DIH", name: "鑽石山" }, { code: "CHH", name: "彩虹" }, { code: "KOB", name: "九龍灣" },
+                    { code: "NTK", name: "牛頭角" }, { code: "KWT", name: "觀塘" }, { code: "LAT", name: "藍田" },
+                    { code: "YAT", name: "油塘" }, { code: "TIK", name: "調景嶺" }
+                ]
+            },
+            "ISL": {
+                name: "港島綫",
+                stations: [
+                    { code: "KET", name: "堅尼地城" }, { code: "HKU", name: "香港大學" }, { code: "SYP", name: "西營盤" },
+                    { code: "SHW", name: "上環" }, { code: "CEN", name: "中環" }, { code: "ADM", name: "金鐘" },
+                    { code: "WAC", name: "灣仔" }, { code: "CAB", name: "銅鑼灣" }, { code: "TIH", name: "天后" },
+                    { code: "FOH", name: "炮台山" }, { code: "NOP", name: "北角" }, { code: "QUB", name: "鰂魚涌" },
+                    { code: "TAK", name: "太古" }, { code: "SWH", name: "西灣河" }, { code: "SKW", name: "筲箕灣" },
+                    { code: "HFC", name: "杏花邨" }, { code: "CHW", name: "柴灣" }
+                ]
+            },
+            "TWL": {
+                name: "荃灣綫",
+                stations: [
+                    { code: "CEN", name: "中環" }, { code: "ADM", name: "金鐘" }, { code: "TST", name: "尖沙咀" },
+                    { code: "JOR", name: "佐敦" }, { code: "YMT", name: "油麻地" }, { code: "MOK", name: "旺角" },
+                    { code: "PRE", name: "太子" }, { code: "SSP", name: "深水埗" }, { code: "CSW", name: "長沙灣" },
+                    { code: "LCK", name: "荔枝角" }, { code: "MEF", name: "美孚" }, { code: "LAK", name: "荔景" },
+                    { code: "KWF", name: "葵芳" }, { code: "KWT", name: "葵興" }, { code: "TWH", name: "大窩口" },
+                    { code: "TSW", name: "荃灣" }
+                ]
+            },
+            "SIL": {
+                name: "南港島綫",
+                stations: [
+                    { code: "ADM", name: "金鐘" }, { code: "OCP", name: "海洋公園" }, { code: "WCH", name: "黃竹坑" },
+                    { code: "LET", name: "利東" }, { code: "SOH", name: "海怡半島" }
+                ]
+            },
+            "TCL": {
+                name: "東涌綫",
+                stations: [
+                    { code: "HOK", name: "香港" }, { code: "KOW", name: "九龍" }, { code: "OLY", name: "奧運" },
+                    { code: "NAC", name: "南昌" }, { code: "LAK", name: "荔景" }, { code: "SUN", name: "欣澳" },
+                    { code: "TOC", name: "東涌" }
+                ]
+            },
+            "EAL": {
+                name: "東鐵綫",
+                stations: [
+                    { code: "ADM", name: "金鐘" }, { code: "EXC", name: "會展" }, { code: "HUH", name: "紅磡" },
+                    { code: "MKK", name: "旺角東" }, { code: "KOT", name: "九龍塘" }, { code: "TAW", name: "大圍" },
+                    { code: "SHT", name: "沙田" }, { code: "FOT", name: "火炭" }, { code: "RAC", name: "馬場" },
+                    { code: "UNI", name: "大學" }, { code: "TAP", name: "大埔墟" }, { code: "TWO", name: "太和" },
+                    { code: "FAN", name: "粉嶺" }, { code: "SHS", name: "上水" }, { code: "LOW", name: "羅湖" },
+                    { code: "LKM", name: "落馬洲" }
+                ]
+            },
+            "TML": {
+                name: "屯馬綫",
+                stations: [
+                    { code: "WKS", name: "烏溪沙" }, { code: "MOS", name: "馬鞍山" }, { code: "HEO", name: "恆安" },
+                    { code: "TSH", name: "大水坑" }, { code: "SHM", name: "石門" }, { code: "CIO", name: "第一城" },
+                    { code: "STW", name: "沙田圍" }, { code: "CKT", name: "車公廟" }, { code: "TAW", name: "大圍" },
+                    { code: "EXC", name: "顯徑" }, { code: "DIH", name: "鑽石山" }, { code: "KAT", name: "啟德" },
+                    { code: "SUW", name: "宋皇臺" }, { code: "TKW", name: "土瓜灣" }, { code: "HOM", name: "何文田" },
+                    { code: "HUH", name: "紅磡" }, { code: "ETS", name: "尖東" }, { code: "AUS", name: "柯士甸" },
+                    { code: "NAC", name: "南昌" }, { code: "MEF", name: "美孚" }, { code: "TWW", name: "荃灣西" },
+                    { code: "KSR", name: "錦上路" }, { code: "YUL", name: "元朗" }, { code: "LOP", name: "朗屏" },
+                    { code: "TIS", name: "天水圍" }, { code: "SIH", name: "兆康" }, { code: "TUM", name: "屯門" }
+                ]
+            },
+            "TKL": {
+                name: "將軍澳綫",
+                stations: [
+                    { code: "NOP", name: "北角" }, { code: "QUB", name: "鰂魚涌" }, { code: "YAT", name: "油塘" },
+                    { code: "TIK", name: "調景嶺" }, { code: "TKO", name: "將軍澳" }, { code: "LHA", name: "康城" },
+                    { code: "HAH", name: "坑口" }, { code: "POA", name: "寶琳" }
+                ]
+            },
+            "AEL": {
+                name: "機場快綫",
+                stations: [
+                    { code: "HOK", name: "香港" }, { code: "KOW", name: "九龍" }, { code: "TSY", name: "青衣" },
+                    { code: "AIR", name: "機場" }, { code: "AWE", name: "博覽館" }
+                ]
+            },
+            "DRL": {
+                name: "迪士尼綫",
+                stations: [
+                    { code: "SUN", name: "欣澳" }, { code: "DIS", name: "迪士尼" }
+                ]
+            }
+        };
+
+        // Complete Station Code to Chinese Name Dict
+        const mtrStationNames = {
+            "WHA": "黃埔", "HOM": "何文田", "YMT": "油麻地", "MOK": "旺角", "PRE": "太子", "SKM": "石硤尾",
+            "KOT": "九龍塘", "LOF": "樂富", "WTS": "黃大仙", "DIH": "鑽石山", "CHH": "彩虹", "KOB": "九龍灣",
+            "NTK": "牛頭角", "KWT": "觀塘", "LAT": "藍田", "YAT": "油塘", "TIK": "調景嶺", "KET": "堅尼地城",
+            "HKU": "香港大學", "SYP": "西營盤", "SHW": "上環", "CEN": "中環", "ADM": "金鐘", "WAC": "灣仔",
+            "CAB": "銅鑼灣", "TIH": "天后", "FOH": "炮台山", "NOP": "北角", "QUB": "鰂魚涌", "TAK": "太古",
+            "SWH": "西灣河", "SKW": "筲箕灣", "HFC": "杏花邨", "CHW": "柴灣", "TST": "尖沙咀", "JOR": "佐敦",
+            "SSP": "深水埗", "CSW": "長沙灣", "LCK": "荔枝角", "MEF": "美孚", "LAK": "荔景", "KWF": "葵芳",
+            "TWH": "大窩口", "TSW": "荃灣", "OCP": "海洋公園", "WCH": "黃竹坑", "LET": "利東", "SOH": "海怡半島",
+            "HOK": "香港", "KOW": "九龍", "OLY": "奧運", "NAC": "南昌", "SUN": "欣澳", "TOC": "東涌",
+            "EXC": "會展", "HUH": "紅磡", "MKK": "旺角東", "TAW": "大圍", "SHT": "沙田", "FOT": "火炭",
+            "RAC": "馬場", "UNI": "大學", "TAP": "大埔墟", "TWO": "太和", "FAN": "粉嶺", "SHS": "上水",
+            "LOW": "羅湖", "LKM": "落馬洲", "WKS": "烏溪沙", "MOS": "馬鞍山", "HEO": "恆安", "TSH": "大水坑",
+            "SHM": "石門", "CIO": "第一城", "STW": "沙田圍", "CKT": "車公廟", "KAT": "啟德", "SUW": "宋皇臺",
+            "TKW": "土瓜灣", "ETS": "尖東", "AUS": "柯士甸", "TWW": "荃灣西", "KSR": "錦上路", "YUL": "元朗",
+            "LOP": "朗屏", "TIS": "天水圍", "SIH": "兆康", "TUM": "屯門", "TKO": "將軍澳", "LHA": "康城",
+            "HAH": "坑口", "POA": "寶琳", "TSY": "青衣", "AIR": "機場", "AWE": "博覽館", "DIS": "迪士尼"
+        };
+
         // Application State Management
-        let currentMode = 'bus'; // 'bus' 或 'mtr'
+        let currentMode = 'bus'; 
         let kmbRoutes = [];
         let ctbRoutes = [];
         let routeMap = new Map(); 
@@ -420,6 +541,7 @@
         let currentRouteStops = []; 
         let currentActiveStop = null;
         let favorites = JSON.parse(localStorage.getItem('hk_bus_favs') || '[]');
+        let mtrFavorites = JSON.parse(localStorage.getItem('hk_mtr_favs') || '[]');
         let userApiKey = localStorage.getItem('gemini_custom_apikey') || '';
 
         let currentGpsRadius = 500;
@@ -427,8 +549,11 @@
         let kmbAllRouteStopsCache = null;
         let isGpsSearching = false;
         let autoRefreshTimer = null;
+        let mtrAutoRefreshTimer = null;
 
-        // Accurate HKO weather stations with coordinates
+        let selectedMtrLine = '';
+        let selectedMtrStation = '';
+
         const hkDistricts = [
             { name: '尖沙咀', hkoName: '香港天文台', lat: 22.3019, lng: 114.1742 },
             { name: '中環', hkoName: '香港公園', lat: 22.2780, lng: 114.1580 },
@@ -444,6 +569,7 @@
         window.onload = async function() {
             fetchWeatherAndLocation();
             renderFavorites();
+            initMtrDropdowns();
             await loadInitialBusData();
 
             if (userApiKey) {
@@ -471,6 +597,7 @@
             const btnBus = document.getElementById('btn-bus');
             const btnMtr = document.getElementById('btn-mtr');
             const busNavActions = document.getElementById('busNavActions');
+            const mtrNavActions = document.getElementById('mtrNavActions');
             const aiTriggerBtn = document.getElementById('aiTriggerBtn');
             const busViewContainer = document.getElementById('busViewContainer');
             const mtrViewContainer = document.getElementById('mtrViewContainer');
@@ -481,6 +608,7 @@
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
                 
                 busNavActions.classList.remove('hidden');
+                mtrNavActions.classList.add('hidden');
                 aiTriggerBtn.classList.remove('hidden');
                 busViewContainer.classList.remove('hidden');
                 mtrViewContainer.classList.add('hidden');
@@ -490,10 +618,207 @@
                 btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
                 
                 busNavActions.classList.add('hidden');
+                mtrNavActions.classList.remove('hidden');
                 aiTriggerBtn.classList.add('hidden');
                 busViewContainer.classList.add('hidden');
                 mtrViewContainer.classList.remove('hidden');
                 favoritesFooter.classList.add('hidden');
+
+                if (selectedMtrLine && selectedMtrStation) {
+                    fetchMtrETA();
+                }
+            }
+        }
+
+        // MTR UI Init & Logic
+        function initMtrDropdowns() {
+            const lineSelect = document.getElementById('mtrLineSelect');
+            let optionsHtml = '<option value="">-- 請選擇路線 --</option>';
+            
+            for (let code in mtrData) {
+                optionsHtml += `<option value="${code}">${mtrData[code].name}</option>`;
+            }
+            lineSelect.innerHTML = optionsHtml;
+
+            const stationSelect = document.getElementById('mtrStationSelect');
+            stationSelect.innerHTML = '<option value="">-- 請先選擇路線 --</option>';
+        }
+
+        function onMtrLineChange() {
+            const lineSelect = document.getElementById('mtrLineSelect');
+            selectedMtrLine = lineSelect.value;
+            const stationSelect = document.getElementById('mtrStationSelect');
+
+            if (!selectedMtrLine || !mtrData[selectedMtrLine]) {
+                stationSelect.innerHTML = '<option value="">-- 請先選擇路線 --</option>';
+                return;
+            }
+
+            let stations = mtrData[selectedMtrLine].stations;
+            let optionsHtml = '<option value="">-- 請選擇車站 --</option>';
+            stations.forEach(s => {
+                optionsHtml += `<option value="${s.code}">${s.name}</option>`;
+            });
+            stationSelect.innerHTML = optionsHtml;
+        }
+
+        function onMtrStationChange() {
+            const stationSelect = document.getElementById('mtrStationSelect');
+            selectedMtrStation = stationSelect.value;
+
+            if (!selectedMtrLine || !selectedMtrStation) return;
+
+            const stationName = mtrStationNames[selectedMtrStation] || selectedMtrStation;
+            document.getElementById('mtrDisplayStationName').textContent = `${stationName}站`;
+            document.getElementById('mtrFavActionArea').classList.remove('hidden');
+
+            updateMtrFavButtonState();
+            fetchMtrETA();
+
+            if (mtrAutoRefreshTimer) clearInterval(mtrAutoRefreshTimer);
+            mtrAutoRefreshTimer = setInterval(fetchMtrETA, 30000);
+        }
+
+        async function fetchMtrETA() {
+            if (!selectedMtrLine || !selectedMtrStation) return;
+
+            const container = document.getElementById('mtrEtaListContainer');
+            const icon = document.getElementById('mtrRefreshIcon');
+            const timeEl = document.getElementById('mtrRefreshTime');
+
+            if (icon) icon.classList.add('fa-spin');
+            timeEl.textContent = new Date().toLocaleTimeString('zh-HK', { hour12: false });
+
+            try {
+                const res = await fetch(`https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${selectedMtrLine}&sta=${selectedMtrStation}`);
+                if (!res.ok) throw new Error("HTTP error");
+
+                const data = await res.json();
+                
+                if (data.status === 0 || !data.data) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-amber-400 text-xs font-bold">
+                            <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
+                            <p>${data.message || '暫無列車到站資訊或非服務時間'}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const key = `${selectedMtrLine}-${selectedMtrStation}`;
+                const scheduleData = data.data[key];
+
+                if (!scheduleData) {
+                    container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">暫無列車預報資料</div>`;
+                    return;
+                }
+
+                let trainList = [];
+
+                if (scheduleData.UP) {
+                    scheduleData.UP.forEach(t => trainList.push({ ...t, dir: 'UP' }));
+                }
+                if (scheduleData.DOWN) {
+                    scheduleData.DOWN.forEach(t => trainList.push({ ...t, dir: 'DOWN' }));
+                }
+
+                trainList.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+                if (trainList.length === 0) {
+                    container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">目前方向暫無即將到達的列車</div>`;
+                    return;
+                }
+
+                const lineName = mtrData[selectedMtrLine].name;
+
+                container.innerHTML = trainList.map(t => {
+                    const destName = mtrStationNames[t.dest] || t.dest;
+                    const plat = t.plat || '1';
+
+                    let minutesLeft = 0;
+                    if (t.time) {
+                        const now = new Date();
+                        const arrivalTime = new Date(t.time.replace(/-/g, '/'));
+                        minutesLeft = Math.max(0, Math.floor((arrivalTime - now) / 60000));
+                    }
+
+                    let statusText = `${minutesLeft} 分鐘`;
+                    let isArriving = false;
+
+                    if (minutesLeft <= 0 || t.ttnt === '0' || t.ttnt === '1') {
+                        statusText = "正在離開";
+                        isArriving = true;
+                    }
+
+                    return `
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <span class="bg-emerald-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-md shrink-0">
+                                    ${lineName}
+                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                                        ${plat}
+                                    </span>
+                                    <span class="font-black text-sm text-slate-100">${destName}</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-black text-sm ${isArriving ? 'text-amber-400' : 'text-emerald-400'}">
+                                    ${statusText}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error("MTR Fetch error:", err);
+                container.innerHTML = `
+                    <div class="text-center py-8 text-rose-400 text-xs">
+                        <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
+                        <p>更新列車資訊失敗，請刷新重試</p>
+                    </div>
+                `;
+            } finally {
+                if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+            }
+        }
+
+        function toggleMtrFavorite() {
+            if (!selectedMtrLine || !selectedMtrStation) return;
+            const item = { line: selectedMtrLine, station: selectedMtrStation };
+            const index = mtrFavorites.findIndex(f => f.line === selectedMtrLine && f.station === selectedMtrStation);
+
+            if (index < 0) {
+                mtrFavorites.push(item);
+                localStorage.setItem('hk_mtr_favs', JSON.stringify(mtrFavorites));
+            }
+            updateMtrFavButtonState();
+        }
+
+        function deleteMtrFavorite() {
+            if (!selectedMtrLine || !selectedMtrStation) return;
+            const index = mtrFavorites.findIndex(f => f.line === selectedMtrLine && f.station === selectedMtrStation);
+
+            if (index >= 0) {
+                mtrFavorites.splice(index, 1);
+                localStorage.setItem('hk_mtr_favs', JSON.stringify(mtrFavorites));
+            }
+            updateMtrFavButtonState();
+        }
+
+        function updateMtrFavButtonState() {
+            const isFav = mtrFavorites.some(f => f.line === selectedMtrLine && f.station === selectedMtrStation);
+            const favBtn = document.getElementById('mtrFavBtn');
+            const delBtn = document.getElementById('mtrDelBtn');
+
+            if (isFav) {
+                favBtn.classList.add('hidden');
+                delBtn.classList.remove('hidden');
+            } else {
+                favBtn.classList.remove('hidden');
+                delBtn.classList.add('hidden');
             }
         }
 
@@ -1165,7 +1490,7 @@
             `).join('');
         }
 
-        // GPS Nearby Search Engine
+        // GPS Search Engine
         function openGpsSearchModal() {
             document.getElementById('gpsSearchModal').classList.remove('hidden');
             executeGpsSearch();
