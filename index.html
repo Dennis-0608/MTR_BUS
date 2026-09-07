@@ -595,7 +595,6 @@
             let stations = mtrData[selectedMtrLine].stations;
             let optionsHtml = '<option value="">-- 請選擇車站 --</option>';
             stations.forEach(s => {
-                // 已移除 "🔄 (轉車站)" 標籤[cite: 4]
                 optionsHtml += `<option value="${s.code}">${s.name}</option>`;
             });
             stationSelect.innerHTML = optionsHtml;
@@ -622,7 +621,7 @@
             mtrAutoRefreshTimer = setInterval(fetchMtrETA, 30000);
         }
 
-        // 動態生成該轉車站（如金鐘站）的所有路線篩選按鈕
+        // 動態生成路線篩選按鈕 (僅當途經路線 > 1 條時顯示，即轉車站)
         function renderMtrFilterButtons() {
             const filterContainer = document.getElementById('mtrFilterContainer');
             if (!selectedMtrStation) {
@@ -631,12 +630,14 @@
             }
 
             const passedLines = stationToLinesMap.get(selectedMtrStation) || [];
-            if (passedLines.length === 0) {
+            
+            // 優化項 1：一般車站（非轉車站，途經路線 <= 1）完全隱藏「全部」及路線篩選按鈕
+            if (passedLines.length <= 1) {
                 filterContainer.classList.add('hidden');
                 return;
             }
 
-            // 顯示篩選列
+            // 顯示轉車站篩選列
             filterContainer.classList.remove('hidden');
 
             // 1. 生成「全部」按鈕
@@ -682,7 +683,7 @@
             fetchMtrETA();
         }
 
-        // 支援多路線併發查詢與動態過濾的班次抓取邏輯
+        // 支援多路線併發查詢、動態過濾與班次數量顯示控制的班次抓取邏輯
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
 
@@ -693,7 +694,6 @@
             if (icon) icon.classList.add('fa-spin');
             timeEl.textContent = new Date().toLocaleTimeString('zh-HK', { hour12: false });
 
-            // 判斷查詢目標：若指定了篩選路線則只查詢該路線，否則查詢該車站所有行經路線
             let activeLines = [];
             if (selectedMtrFilterLine !== 'ALL') {
                 activeLines = [selectedMtrFilterLine];
@@ -726,11 +726,24 @@
                     const scheduleData = data.data[key];
                     if (!scheduleData) return;
 
-                    if (scheduleData.UP) {
-                        scheduleData.UP.forEach(t => combinedTrainList.push({ ...t, lineCode, dir: 'UP' }));
-                    }
-                    if (scheduleData.DOWN) {
-                        scheduleData.DOWN.forEach(t => combinedTrainList.push({ ...t, lineCode, dir: 'DOWN' }));
+                    const upTrains = (scheduleData.UP || []).map(t => ({ ...t, lineCode, dir: 'UP' }));
+                    const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
+
+                    // 按抵達時間遞增排序
+                    upTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
+                    downTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+                    // 優化項 2：判斷是否為總站（單向服務或無列車進站，如柴灣、荃灣、堅尼地城、黃埔等）
+                    const isTerminal = (upTrains.length === 0 || downTrains.length === 0);
+
+                    if (isTerminal) {
+                        // 總站：顯示 4 個班次
+                        const available = upTrains.length > 0 ? upTrains : downTrains;
+                        combinedTrainList.push(...available.slice(0, 4));
+                    } else {
+                        // 非總站：來往方向各只取最近 2 個班次 (合計 4 個班次)
+                        combinedTrainList.push(...upTrains.slice(0, 2));
+                        combinedTrainList.push(...downTrains.slice(0, 2));
                     }
                 });
 
@@ -744,7 +757,7 @@
                     return;
                 }
 
-                // 按列車預計抵達時間全局升序排序
+                // 全局按照時間再次排序以清單呈現
                 combinedTrainList.sort((a, b) => new Date(a.time) - new Date(b.time));
 
                 container.innerHTML = combinedTrainList.map(t => {
