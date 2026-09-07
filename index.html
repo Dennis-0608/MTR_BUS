@@ -141,7 +141,6 @@
                         <div class="flex items-center gap-2 overflow-hidden">
                             <span id="displayCompanyTag" class="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">九巴 (KMB)</span>
                             <span id="displayRouteSeq" class="hidden">路線 --</span>
-                            <!-- 字體增加 4px (由 text-xs sm:text-sm 調整為 text-base) -->
                             <p id="displayBoundInfo" class="text-base font-bold text-indigo-400 truncate">請點擊上方的搜尋或 GPS 按鈕</p>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
@@ -162,7 +161,6 @@
 
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 shrink-0">
-                        <!-- 標題字體增加 4px (由 text-xs 提升至 text-base) -->
                         <h3 class="text-base font-bold text-slate-200 flex items-center gap-2">
                             <i class="fa-regular fa-clock text-rose-500 text-base"></i>
                             <span>即時到站預報 (ETA)</span>
@@ -494,6 +492,9 @@
         let autoRefreshTimer = null;
         let mtrAutoRefreshTimer = null;
 
+        // 【新增】：用於追蹤到達班次的 30 秒倒數時間戳
+        let busArrivingTracker = {};
+
         let selectedMtrLine = '';
         let selectedMtrStation = '';
         let selectedMtrFilterLine = 'ALL';
@@ -557,7 +558,7 @@
                 if (currentActiveStop) {
                     fetchRealTimeETA();
                     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-                    autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
+                    autoRefreshTimer = setInterval(fetchRealTimeETA, 10000); // 頻率調高至 10 秒以精準計算 30 秒倒數
                 }
             } else {
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-purple-700 text-white shadow-sm";
@@ -1278,9 +1279,8 @@
             renderActiveStopDashboard();
             fetchRealTimeETA();
 
-            // 設定 30 秒自動更新預報
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 30000);
+            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 10000);
         }
 
         function renderActiveStopDashboard() {
@@ -1304,12 +1304,14 @@
             updateFavButtonState();
         }
 
+        // 【修改核心】：加入 30 秒過期邏輯與班次替換機制
         async function fetchRealTimeETA() {
             if (!currentActiveStop) return;
 
             const container = document.getElementById('etaListContainer');
             const refreshTimeEl = document.getElementById('etaRefreshTime');
             const now = new Date();
+            const nowMs = now.getTime();
             refreshTimeEl.textContent = now.toLocaleTimeString('zh-HK', { hour12: false });
 
             try {
@@ -1350,7 +1352,33 @@
                     }
                 }
 
-                if (!etas || etas.length === 0) {
+                // 過濾並處理 30 秒緩衝時間
+                const validEtas = [];
+                
+                etas.forEach((item) => {
+                    if (!item.eta) return;
+                    
+                    const etaMs = new Date(item.eta).getTime();
+                    const diffMs = etaMs - nowMs;
+                    const busKey = `${item.route}_${item.eta}_${item.eta_seq || ''}`;
+
+                    if (diffMs <= 0) {
+                        // 當班次時間已過，記錄第一次到達時的時間戳
+                        if (!busArrivingTracker[busKey]) {
+                            busArrivingTracker[busKey] = nowMs;
+                        }
+
+                        // 檢查從到達至今是否未滿 30 秒 (30000 毫秒)
+                        const elapsedSec = (nowMs - busArrivingTracker[busKey]) / 1000;
+                        if (elapsedSec <= 30) {
+                            validEtas.push({ ...item, isArriving: true });
+                        }
+                    } else {
+                        validEtas.push({ ...item, isArriving: false });
+                    }
+                });
+
+                if (validEtas.length === 0) {
                     container.innerHTML = `
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
@@ -1361,22 +1389,18 @@
                     return;
                 }
 
-                container.innerHTML = etas.slice(0, 4).map((item, idx) => {
-                    const etaTimeStr = item.eta ? new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
-                    let diffMins = '--';
-                    let diffSec = 0;
-                    if (item.eta) {
-                        const diffMs = new Date(item.eta) - new Date();
-                        diffSec = Math.floor(diffMs / 1000);
-                        diffMins = Math.max(0, Math.floor(diffMs / 60000));
-                    }
+                container.innerHTML = validEtas.slice(0, 4).map((item, idx) => {
+                    const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    const diffMs = new Date(item.eta) - now;
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
 
-                    // 班次時間文字微調放大 (+4px 效果)
                     let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
-                    if (diffSec > 0 && diffSec <= 60) {
-                        timeBadge = `<span class="px-2.5 py-1 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-sm">即將抵達</span>`;
-                    } else if (diffSec <= 0) {
+                    
+                    if (item.isArriving || diffSec <= 0) {
                         timeBadge = `<span class="px-2.5 py-1 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-sm">即將到達</span>`;
+                    } else if (diffSec > 0 && diffSec <= 60) {
+                        timeBadge = `<span class="px-2.5 py-1 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-sm">即將抵達</span>`;
                     }
 
                     let remark = item.rmk_tc || item.remark_tc || '實時班次';
@@ -1539,10 +1563,9 @@
 
             renderActiveStopDashboard();
             fetchRealTimeETA();
-            
-            // 啟動 30 秒自動更新預報
+
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
 
             fetchStopsForSelectedRoute(true);
         }
@@ -1608,7 +1631,7 @@
             fetchRealTimeETA();
 
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
         }
 
         function filterChangeStops() {
@@ -1899,7 +1922,7 @@
             fetchRealTimeETA();
 
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 30000);
+            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 10000);
 
             fetchStopsForSelectedRoute(true);
         }
@@ -1968,17 +1991,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [
-                            { role: 'user', parts: [{ text: `${systemInstruction}\n\n用戶問題: ${text}` }] }
+                            { role: 'user', parts: [{ text: `${systemInstruction}\n\n用戶問題：${text}` }] }
                         ]
                     })
                 });
 
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                const data = await res.json();
+                const loadEl = document.getElementById(loadingId);
+                if (loadEl) loadEl.remove();
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法回應。';
+                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                    const aiReply = data.candidates[0].content.parts[0].text;
                     chatBox.innerHTML += `
                         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed shadow">
                             ${parseMarkdown(aiReply)}
@@ -1987,16 +2010,16 @@
                 } else {
                     chatBox.innerHTML += `
                         <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            API 請求失敗，請檢查 API Key 是否正確。
+                            AI 回應失敗，請檢查 API Key 是否正確。
                         </div>
                     `;
                 }
             } catch (err) {
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                const loadEl = document.getElementById(loadingId);
+                if (loadEl) loadEl.remove();
                 chatBox.innerHTML += `
                     <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        網絡連線錯誤，請稍後重試。
+                        連線至 AI 服務失敗，請重試。
                     </div>
                 `;
             }
