@@ -3,159 +3,290 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTR 到站預報優化版</title>
+  <title>綜合公共交通到站預報系統 (MTR + Bus)</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; padding: 20px; color: #333; }
-    .card { background: #fff; border-radius: 12px; padding: 20px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    .station-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-    
-    /* 轉車站路線選擇按鈕 */
-    .filter-group { display: flex; gap: 8px; margin-bottom: 20px; }
-    .filter-btn { flex: 1; padding: 8px 12px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s; }
-    .filter-btn.active { background: #0056b3; color: #fff; border-color: #0056b3; }
+    :root {
+      --primary-color: #0056b3;
+      --bg-color: #f4f7f9;
+      --card-bg: #ffffff;
+      --text-main: #2c3e50;
+      --text-sub: #7f8c8d;
+      --ktl-color: #00af41;
+      --tml-color: #920783;
+      --bus-kmb-color: #ed1c24;
+      --bus-ctb-color: #f1b700;
+    }
 
-    /* 路線與班次樣式 */
-    .line-block { margin-bottom: 20px; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
-    .line-header { padding: 8px 12px; font-weight: bold; color: white; }
-    .line-KTL { background-color: #00af41; } /* 觀塘線綠色 */
-    .line-TML { background-color: #920783; } /* 屯馬線棕紫色 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: var(--text-main); padding: 20px; }
     
-    .direction-block { padding: 12px; border-bottom: 1px solid #eee; }
+    .container { max-width: 600px; margin: 0 auto; }
+    
+    /* 主頁籤切換 (MTR / Bus) */
+    .tab-nav { display: flex; background: #e0e6ed; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; font-size: 1rem; font-weight: bold; color: var(--text-sub); border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+    .tab-btn.active { background: var(--card-bg); color: var(--primary-color); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+
+    /* 面板卡片容器 */
+    .main-card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    
+    /* 站名與路線控制項 */
+    .selector-group { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+    .select-control { flex: 1; padding: 10px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 0.95rem; background: #fff; }
+
+    /* 次級篩選按鈕 (轉車站/巴士路線) */
+    .filter-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+    .filter-btn { flex: 1; min-width: 80px; padding: 8px 12px; border: 1px solid #dcdfe6; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; text-align: center; transition: all 0.2s; }
+    .filter-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+
+    /* MTR 路線資訊區塊 */
+    .line-card { border: 1px solid #eef0f3; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+    .line-header { padding: 10px 15px; color: white; font-weight: bold; font-size: 0.95rem; }
+    .line-KTL { background-color: var(--ktl-color); }
+    .line-TML { background-color: var(--tml-color); }
+    .line-BUS-KMB { background-color: var(--bus-kmb-color); }
+    .line-BUS-CTB { background-color: var(--bus-ctb-color); color: #000; }
+
+    /* 到站班次列表 */
+    .direction-block { padding: 12px 15px; border-bottom: 1px solid #f0f2f5; }
     .direction-block:last-child { border-bottom: none; }
-    .dir-title { font-size: 0.9rem; color: #666; margin-bottom: 8px; }
+    .dir-title { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 8px; font-weight: bold; }
     .train-list { display: flex; gap: 8px; flex-wrap: wrap; }
-    .train-badge { background: #eef2f5; padding: 6px 10px; border-radius: 4px; font-size: 0.95rem; font-weight: 600; }
-    .empty-msg { color: #999; font-size: 0.85rem; font-style: italic; }
+    .badge { background: #f0f4f8; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; color: var(--text-main); }
+    .badge .sub-info { font-size: 0.75rem; color: var(--text-sub); font-weight: normal; margin-left: 4px; }
+    
+    .empty-msg { color: #95a5a6; font-size: 0.85rem; font-style: italic; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <div class="station-title" id="stationName">載入中...</div>
-  
-  <!-- 轉車站切換頁籤 (預設隱藏，若為轉車站才顯示) -->
-  <div class="filter-group" id="filterGroup" style="display: none;"></div>
+<div class="container">
+  <!-- 頂部頁籤切換：港鐵 / 巴士 -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchMode('mtr')">🚇 港鐵到站預報</button>
+    <button class="tab-btn" onclick="switchMode('bus')">🚌 巴士到站預報</button>
+  </div>
 
-  <!-- 到站時間展示區 -->
-  <div id="scheduleContainer"></div>
+  <div class="main-card">
+    <!-- ==================== 港鐵模組 ==================== -->
+    <div id="mtrModule">
+      <div class="selector-group">
+        <label for="mtrStationSelect"><b>選擇車站：</b></label>
+        <select id="mtrStationSelect" class="select-control" onchange="onMtrStationChange(this.value)">
+          <option value="DIH">鑽石山站 (轉車站)</option>
+          <option value="WHA">黃埔站 (終點站)</option>
+          <option value="PRE">太子站 (一般轉車站)</option>
+        </select>
+      </div>
+
+      <!-- 轉車站路線篩選器 (動態生成) -->
+      <div class="filter-group" id="mtrFilterGroup"></div>
+
+      <!-- 港鐵預報列表 -->
+      <div id="mtrScheduleContainer"></div>
+    </div>
+
+    <!-- ==================== 巴士模組 ==================== -->
+    <div id="busModule" class="hidden">
+      <div class="selector-group">
+        <label for="busRouteSelect"><b>選擇路線：</b></label>
+        <select id="busRouteSelect" class="select-control" onchange="onBusRouteChange(this.value)">
+          <option value="1A">九巴 1A (尖沙咀碼頭 ↔ 中秀茂坪)</option>
+          <option value="102">城巴 102 (美孚 ↔ 筲箕灣)</option>
+        </select>
+      </div>
+
+      <!-- 巴士去程/回程切換器 -->
+      <div class="filter-group" id="busBoundGroup"></div>
+
+      <!-- 巴士預報列表 -->
+      <div id="busScheduleContainer"></div>
+    </div>
+  </div>
 </div>
 
 <script>
 /**
- * 1. 模擬 API 回傳資料 (符合真實 MTR API 結構之簡化版)
+ * Global App State (全域狀態管理)
  */
-const mockApiData = {
-  "DIH": { // 鑽石山站 (轉車站)
-    name: "鑽石山 Diamond Hill",
-    isInterchange: true,
-    lines: [
-      {
-        lineCode: "KTL",
-        lineName: "觀塘線",
-        isTerminal: false,
-        UP: [ { dest: "調景嶺", ttnt: "2" }, { dest: "調景嶺", ttnt: "6" }, { dest: "調景嶺", ttnt: "10" } ],
-        DOWN: [ { dest: "黃埔", ttnt: "1" }, { dest: "黃埔", ttnt: "5" }, { dest: "黃埔", ttnt: "8" } ]
-      },
-      {
-        lineCode: "TML",
-        lineName: "屯馬線",
-        isTerminal: false,
-        UP: [ { dest: "烏溪沙", ttnt: "3" }, { dest: "烏溪沙", ttnt: "7" } ],
-        DOWN: [ { dest: "屯門", ttnt: "4" }, { dest: "屯門", ttnt: "9" } ]
-      }
-    ]
+const state = {
+  currentMode: 'mtr',     // 'mtr' | 'bus'
+  mtrStation: 'DIH',      // 當前選擇港鐵站
+  mtrFilter: 'ALL',       // 港鐵路線篩選 ('ALL', 'KTL', 'TML' 等)
+  busRoute: '1A',         // 當前選擇巴士路線
+  busBound: 'OUTBOUND'    // 巴士方向 ('OUTBOUND' | 'INBOUND')
+};
+
+/**
+ * 模擬 API 資料庫 (實務上改為 fetch API 數據)
+ */
+const mockDb = {
+  mtr: {
+    "DIH": {
+      name: "鑽石山 Diamond Hill",
+      isInterchange: true,
+      lines: [
+        {
+          lineCode: "KTL", lineName: "觀塘線", isTerminal: false,
+          UP: [{ dest: "調景嶺", ttnt: "2" }, { dest: "調景嶺", ttnt: "6" }, { dest: "調景嶺", ttnt: "10" }],
+          DOWN: [{ dest: "黃埔", ttnt: "1" }, { dest: "黃埔", ttnt: "5" }, { dest: "黃埔", ttnt: "8" }]
+        },
+        {
+          lineCode: "TML", lineName: "屯馬線", isTerminal: false,
+          UP: [{ dest: "烏溪沙", ttnt: "3" }, { dest: "烏溪沙", ttnt: "7" }],
+          DOWN: [{ dest: "屯門", ttnt: "4" }, { dest: "屯門", ttnt: "9" }]
+        }
+      ]
+    },
+    "WHA": {
+      name: "黃埔 Whampoa",
+      isInterchange: false,
+      lines: [
+        {
+          lineCode: "KTL", lineName: "觀塘線", isTerminal: true,
+          UP: [
+            { dest: "調景嶺", ttnt: "2" }, { dest: "調景嶺", ttnt: "6" },
+            { dest: "調景嶺", ttnt: "11" }, { dest: "調景嶺", ttnt: "15" },
+            { dest: "調景嶺", ttnt: "19" } // 第5班，邏輯需過濾
+          ],
+          DOWN: [] // 終點站落客月台無班次
+        }
+      ]
+    },
+    "PRE": {
+      name: "太子 Prince Edward",
+      isInterchange: true,
+      lines: [
+        {
+          lineCode: "KTL", lineName: "觀塘線", isTerminal: false,
+          UP: [{ dest: "調景嶺", ttnt: "3" }, { dest: "調景嶺", ttnt: "7" }],
+          DOWN: [{ dest: "黃埔", ttnt: "2" }, { dest: "黃埔", ttnt: "6" }]
+        }
+      ]
+    }
   },
-  "WHA": { // 黃埔站 (終點站範例)
-    name: "黃埔 Whampoa",
-    isInterchange: false,
-    lines: [
-      {
-        lineCode: "KTL",
-        lineName: "觀塘線",
-        isTerminal: true,
-        UP: [ 
-          { dest: "調景嶺", ttnt: "2" }, { dest: "調景嶺", ttnt: "6" }, 
-          { dest: "調景嶺", ttnt: "11" }, { dest: "調景嶺", ttnt: "15" },
-          { dest: "調景嶺", ttnt: "19" } // 第5班，應被過濾掉
-        ],
-        DOWN: [] // 終點站落客月台，無開出方向
+  bus: {
+    "1A": {
+      company: "KMB",
+      companyName: "九巴 1A",
+      classCode: "BUS-KMB",
+      bounds: {
+        "OUTBOUND": {
+          dirName: "往 中秀茂坪",
+          stops: [
+            { stopName: "尖沙咀碼頭", etas: [{ ttnt: "3", remark: "原定班次" }, { ttnt: "12", remark: "" }] },
+            { stopName: "雅蘭中心 (旺角)", etas: [{ ttnt: "1", remark: "即將到達" }, { ttnt: "8", remark: "" }, { ttnt: "15", remark: "" }] }
+          ]
+        },
+        "INBOUND": {
+          dirName: "往 尖沙咀碼頭",
+          stops: [
+            { stopName: "中秀茂坪總站", etas: [{ ttnt: "5", remark: "" }, { ttnt: "18", remark: "" }] }
+          ]
+        }
       }
-    ]
+    },
+    "102": {
+      company: "CTB",
+      companyName: "城巴 102",
+      classCode: "BUS-CTB",
+      bounds: {
+        "OUTBOUND": {
+          dirName: "往 筲箕灣",
+          stops: [
+            { stopName: "美孚巴士總站", etas: [{ ttnt: "4", remark: "" }, { ttnt: "14", remark: "" }] }
+          ]
+        },
+        "INBOUND": {
+          dirName: "往 美孚",
+          stops: [
+            { stopName: "筲箕灣總站", etas: [{ ttnt: "2", remark: "" }, { ttnt: "10", remark: "" }] }
+          ]
+        }
+      }
+    }
   }
 };
 
-// 目前選取的車站與路線篩選狀態
-let currentStationKey = "DIH"; // 可切換測試 "DIH" 或 "WHA"
-let currentFilter = "ALL";
+/* ==================== 1. 業務邏輯處理器 (Core Logic) ==================== */
 
 /**
- * 2. 核心數據處理邏輯 (純函數設計，方便單元測試)
+ * 處理港鐵到站資料邏輯
+ * 規則 1：普通站顯示前往兩邊終點方向班次
+ * 規則 2：終點站只顯示前往另一方向最多 4 個班次
+ * 規則 3：轉車站可按選擇過濾路線
  */
-function processScheduleData(stationData, lineFilter) {
-  // 需求 3：根據選擇過濾路線
-  const linesToProcess = stationData.lines.filter(line => {
-    if (lineFilter === 'ALL') return true;
-    return line.lineCode === lineFilter;
+function processMtrData(stationData, activeFilter) {
+  const filteredLines = stationData.lines.filter(line => {
+    return activeFilter === 'ALL' || line.lineCode === activeFilter;
   });
 
-  return linesToProcess.map(line => {
-    // 需求 2：如果是終點站，只取有開出班次的方向，且只保留前 4 班
+  return filteredLines.map(line => {
     if (line.isTerminal) {
+      // 終點站邏輯：只取有車開出的方向，並強制限止 4 班
       const activeDir = line.UP.length > 0 ? line.UP : line.DOWN;
       return {
         lineCode: line.lineCode,
         lineName: line.lineName,
-        directions: [
-          {
-            dest: activeDir[0]?.dest || "終點站",
-            trains: activeDir.slice(0, 4) // 精確限制最多 4 班
-          }
-        ]
+        directions: [{
+          dest: activeDir[0]?.dest || "開出方向",
+          trains: activeDir.slice(0, 4) // 精確裁切 4 班
+        }]
       };
     }
 
-    // 需求 1：普通站顯示前往兩邊終點方向的所有班次
+    // 普通站/雙向轉車站邏輯
     return {
       lineCode: line.lineCode,
       lineName: line.lineName,
       directions: [
-        { dest: line.UP[0]?.dest || "往上行方向", trains: line.UP },
-        { dest: line.DOWN[0]?.dest || "往下行方向", trains: line.DOWN }
+        { dest: line.UP[0]?.dest || "往上行", trains: line.UP },
+        { dest: line.DOWN[0]?.dest || "往下行", trains: line.DOWN }
       ]
     };
   });
 }
 
 /**
- * 3. 畫面渲染邏輯
+ * 處理巴士到站資料邏輯
  */
-function renderUI() {
-  const station = mockApiData[currentStationKey];
-  document.getElementById("stationName").innerText = station.name;
+function processBusData(routeData, activeBound) {
+  const boundInfo = routeData.bounds[activeBound];
+  return {
+    companyClass: routeData.classCode,
+    companyName: routeData.companyName,
+    dirName: boundInfo ? boundInfo.dirName : "未知方向",
+    stops: boundInfo ? boundInfo.stops : []
+  };
+}
 
-  // 渲染轉車站按鈕 (需求 3)
-  const filterGroup = document.getElementById("filterGroup");
-  if (station.isInterchange) {
+/* ==================== 2. UI 渲染控制 (Render Logic) ==================== */
+
+function renderMtrUI() {
+  const station = mockDb.mtr[state.mtrStation];
+  const filterGroup = document.getElementById("mtrFilterGroup");
+  
+  // 轉車站按鈕渲染
+  if (station.isInterchange && station.lines.length > 1) {
     filterGroup.style.display = "flex";
-    
-    // 動態生成按鈕選項
-    let filterHtml = `<button class="filter-btn ${currentFilter === 'ALL' ? 'active' : ''}" onclick="setFilter('ALL')">全部</button>`;
+    let html = `<button class="filter-btn ${state.mtrFilter === 'ALL' ? 'active' : ''}" onclick="setMtrFilter('ALL')">全部路線</button>`;
     station.lines.forEach(line => {
-      filterHtml += `<button class="filter-btn ${currentFilter === line.lineCode ? 'active' : ''}" onclick="setFilter('${line.lineCode}')">${line.lineName}</button>`;
+      html += `<button class="filter-btn ${state.mtrFilter === line.lineCode ? 'active' : ''}" onclick="setMtrFilter('${line.lineCode}')">${line.lineName}</button>`;
     });
-    filterGroup.innerHTML = filterHtml;
+    filterGroup.innerHTML = html;
   } else {
     filterGroup.style.display = "none";
   }
 
-  // 處理數據並生成班次 HTML
-  const processedData = processScheduleData(station, currentFilter);
-  const container = document.getElementById("scheduleContainer");
+  // 渲染班次列表
+  const processedLines = processMtrData(station, state.mtrFilter);
+  const container = document.getElementById("mtrScheduleContainer");
   container.innerHTML = "";
 
-  processedData.forEach(line => {
+  processedLines.forEach(line => {
     let lineHtml = `
-      <div class="line-block">
+      <div class="line-card">
         <div class="line-header line-${line.lineCode}">${line.lineName}</div>
     `;
 
@@ -166,11 +297,11 @@ function renderUI() {
           <div class="train-list">
       `;
 
-      if (dir.trains.length === 0) {
-        lineHtml += `<span class="empty-msg">暫無列車資訊</span>`;
+      if (!dir.trains || dir.trains.length === 0) {
+        lineHtml += `<span class="empty-msg">未有即時班次資訊</span>`;
       } else {
-        dir.trains.forEach(t => {
-          lineHtml += `<span class="train-badge">${t.ttnt} 分鐘</span>`;
+        dir.trains.forEach(train => {
+          lineHtml += `<span class="badge">${train.ttnt} 分鐘</span>`;
         });
       }
 
@@ -182,16 +313,92 @@ function renderUI() {
   });
 }
 
-/**
- * 4. 控制器事件
- */
-function setFilter(filterType) {
-  currentFilter = filterType;
-  renderUI();
+function renderBusUI() {
+  const route = mockDb.bus[state.busRoute];
+  const boundGroup = document.getElementById("busBoundGroup");
+
+  // 渲染去程/回程切換按鈕
+  boundGroup.innerHTML = `
+    <button class="filter-btn ${state.busBound === 'OUTBOUND' ? 'active' : ''}" onclick="setBusBound('OUTBOUND')">${route.bounds.OUTBOUND.dirName}</button>
+    <button class="filter-btn ${state.busBound === 'INBOUND' ? 'active' : ''}" onclick="setBusBound('INBOUND')">${route.bounds.INBOUND.dirName}</button>
+  `;
+
+  // 渲染巴士站預報
+  const processedBus = processBusData(route, state.busBound);
+  const container = document.getElementById("busScheduleContainer");
+  container.innerHTML = "";
+
+  let cardHtml = `
+    <div class="line-card">
+      <div class="line-header ${processedBus.companyClass}">${processedBus.companyName} - ${processedBus.dirName}</div>
+  `;
+
+  processedBus.stops.forEach(stop => {
+    cardHtml += `
+      <div class="direction-block">
+        <div class="dir-title">🚏 ${stop.stopName}</div>
+        <div class="train-list">
+    `;
+
+    if (!stop.etas || stop.etas.length === 0) {
+      cardHtml += `<span class="empty-msg">暫無預報</span>`;
+    } else {
+      stop.etas.forEach(eta => {
+        const remarkText = eta.remark ? `<span class="sub-info">(${eta.remark})</span>` : '';
+        cardHtml += `<span class="badge">${eta.ttnt} 分鐘${remarkText}</span>`;
+      });
+    }
+
+    cardHtml += `</div></div>`;
+  });
+
+  cardHtml += `</div>`;
+  container.innerHTML = cardHtml;
 }
 
-// 初始化渲染
-renderUI();
+/* ==================== 3. 事件與狀態控制器 (Controllers) ==================== */
+
+function switchMode(mode) {
+  state.currentMode = mode;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  
+  if (mode === 'mtr') {
+    event.target.classList.add('active');
+    document.getElementById('mtrModule').classList.remove('hidden');
+    document.getElementById('busModule').classList.add('hidden');
+    renderMtrUI();
+  } else {
+    event.target.classList.add('active');
+    document.getElementById('mtrModule').classList.add('hidden');
+    document.getElementById('busModule').classList.remove('hidden');
+    renderBusUI();
+  }
+}
+
+function onMtrStationChange(stationCode) {
+  state.mtrStation = stationCode;
+  state.mtrFilter = 'ALL'; // 更換車站時重置篩選
+  renderMtrUI();
+}
+
+function setMtrFilter(filterCode) {
+  state.mtrFilter = filterCode;
+  renderMtrUI();
+}
+
+function onBusRouteChange(routeCode) {
+  state.busRoute = routeCode;
+  state.busBound = 'OUTBOUND'; // 更換路線時重置方向
+  renderBusUI();
+}
+
+function setBusBound(boundKey) {
+  state.busBound = boundKey;
+  renderBusUI();
+}
+
+// 初始化執行
+renderMtrUI();
 </script>
 
 </body>
