@@ -409,7 +409,7 @@
     </div>
 
     <script>
-        // MTR Lines and Stations Dataset (優化1: 修正東鐵綫落馬洲代碼為 LMC)
+        // MTR Lines and Stations Dataset
         const mtrData = {
             "KTL": { name: "觀塘綫", stations: [{ code: "WHA", name: "黃埔" }, { code: "HOM", name: "何文田" }, { code: "YMT", name: "油麻地" }, { code: "MOK", name: "旺角" }, { code: "PRE", name: "太子" }, { code: "SKM", name: "石硤尾" }, { code: "KOT", name: "九龍塘" }, { code: "LOF", name: "樂富" }, { code: "WTS", name: "黃大仙" }, { code: "DIH", name: "鑽石山" }, { code: "CHH", name: "彩虹" }, { code: "KOB", name: "九龍灣" }, { code: "NTK", name: "牛頭角" }, { code: "KWT", name: "觀塘" }, { code: "LAT", name: "藍田" }, { code: "YAT", name: "油塘" }, { code: "TIK", name: "調景嶺" }] },
             "ISL": { name: "港島綫", stations: [{ code: "KET", name: "堅尼地城" }, { code: "HKU", name: "香港大學" }, { code: "SYP", name: "西營盤" }, { code: "SHW", name: "上環" }, { code: "CEN", name: "中環" }, { code: "ADM", name: "金鐘" }, { code: "WAC", name: "灣仔" }, { code: "CAB", name: "銅鑼灣" }, { code: "TIH", name: "天后" }, { code: "FOH", name: "炮台山" }, { code: "NOP", name: "北角" }, { code: "QUB", name: "鰂魚涌" }, { code: "TAK", name: "太古" }, { code: "SWH", name: "西灣河" }, { code: "SKW", name: "筲箕灣" }, { code: "HFC", name: "杏花邨" }, { code: "CHW", name: "柴灣" }] },
@@ -436,7 +436,6 @@
             "TML": "#9a3820"
         };
 
-        // 修正 LMC 對照名稱
         const mtrStationNames = {
             "WHA": "黃埔", "HOM": "何文田", "YMT": "油麻地", "MOK": "旺角", "PRE": "太子", "SKM": "石硤尾", "KOT": "九龍塘", "LOF": "樂富", "WTS": "黃大仙", "DIH": "鑽石山", "CHH": "彩虹", "KOB": "九龍灣", "NTK": "牛頭角", "KWT": "觀塘", "LAT": "藍田", "YAT": "油塘", "TIK": "調景嶺", "KET": "堅尼地城", "HKU": "香港大學", "SYP": "西營盤", "SHW": "上環", "CEN": "中環", "ADM": "金鐘", "WAC": "灣仔", "CAB": "銅鑼灣", "TIH": "天后", "FOH": "炮台山", "NOP": "北角", "QUB": "鰂魚涌", "TAK": "太古", "SWH": "西灣河", "SKW": "筲箕灣", "HFC": "杏花邨", "CHW": "柴灣", "TST": "尖沙咀", "JOR": "佐敦", "SSP": "深水埗", "CSW": "長沙灣", "LCK": "荔枝角", "MEF": "美孚", "LAK": "荔景", "KWF": "葵芳", "TWH": "大窩口", "TSW": "荃灣", "OCP": "海洋公園", "WCH": "黃竹坑", "LET": "利東", "SOH": "海怡半島", "HOK": "香港", "KOW": "九龍", "OLY": "奧運", "NAC": "南昌", "SUN": "欣澳", "TOC": "東涌", "EXC": "會展", "HUH": "紅磡", "MKK": "旺角東", "TAW": "大圍", "SHT": "沙田", "FOT": "火炭", "RAC": "馬場", "UNI": "大學", "TAP": "大埔墟", "TWO": "太和", "FAN": "粉嶺", "SHS": "上水", "LOW": "羅湖", "LMC": "落馬洲", "WKS": "烏溪沙", "MOS": "馬鞍山", "HEO": "恆安", "TSH": "大水坑", "SHM": "石門", "CIO": "第一城", "STW": "沙田圍", "CKT": "車公廟", "KAT": "啟德", "SUW": "宋皇臺", "TKW": "土瓜灣", "ETS": "尖東", "AUS": "柯士甸", "TWW": "荃灣西", "KSR": "錦上路", "YUL": "元朗", "LOP": "朗屏", "TIS": "天水圍", "SIH": "兆康", "TUM": "屯門", "TKO": "將軍澳", "LHP": "康城", "HAH": "坑口", "POA": "寶琳", "TSY": "青衣", "AIR": "機場", "AWE": "博覽館", "DIS": "迪士尼"
         };
@@ -605,7 +604,7 @@
             fetchMtrETA();
 
             if (mtrAutoRefreshTimer) clearInterval(mtrAutoRefreshTimer);
-            mtrAutoRefreshTimer = setInterval(fetchMtrETA, 10000); // 縮減刷新時間以確保 30 秒狀態能精確更新
+            mtrAutoRefreshTimer = setInterval(fetchMtrETA, 10000);
         }
 
         function renderMtrFilterButtons() {
@@ -664,7 +663,7 @@
             fetchMtrETA();
         }
 
-        // 優化3: 修正港鐵 ETA 的「即將抵達」(0-30s) 與「正在離開」(過站 0-30s)，超過 30 秒自動過濾由下一班車代替
+        // 嚴格過濾與到站邏輯重構
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
 
@@ -697,7 +696,7 @@
                 );
 
                 const results = await Promise.all(fetchPromises);
-                let combinedTrainList = [];
+                let lineGroupedTrains = {};
 
                 results.forEach(({ lineCode, data }) => {
                     if (!data || data.status === 0 || !data.data) return;
@@ -710,35 +709,40 @@
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
                     upTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
-                    downTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
+                    downTrains.sort((a, b) => new Date(b.time) - new Date(a.time));
 
-                    const isTerminal = (upTrains.length === 0 || downTrains.length === 0);
-
-                    if (isTerminal) {
-                        const available = upTrains.length > 0 ? upTrains : downTrains;
-                        combinedTrainList.push(...available);
-                    } else {
-                        combinedTrainList.push(...upTrains);
-                        combinedTrainList.push(...downTrains);
-                    }
-                });
-
-                const now = new Date();
-                let validTrainList = [];
-
-                combinedTrainList.forEach(t => {
-                    if (t.time) {
-                        const arrivalTime = new Date(t.time.replace(/-/g, '/'));
-                        const diffSec = Math.floor((arrivalTime - now) / 1000);
-                        
-                        // 過站超過 30 秒者自動捨棄，由下一班列車替補
-                        if (diffSec >= -30) {
-                            validTrainList.push({ ...t, diffSec });
+                    const now = new Date();
+                    
+                    // 獨立處理各方向，嚴格限制一般車站來回各 2 班
+                    let processDirectionTrains = (trains) => {
+                        let valid = [];
+                        for (let t of trains) {
+                            if (t.time) {
+                                const arrivalTime = new Date(t.time.replace(/-/g, '/'));
+                                const diffSec = Math.floor((arrivalTime - now) / 1000);
+                                if (diffSec >= -30) { // 超過 30 秒過站自動過濾
+                                    valid.push({ ...t, diffSec });
+                                }
+                            }
                         }
+                        return valid.slice(0, 2); // 嚴格控制每方向最多 2 班
+                    };
+
+                    let validUp = processDirectionTrains(upTrains);
+                    let validDown = processDirectionTrains(downTrains);
+
+                    if (!lineGroupedTrains[lineCode]) {
+                        lineGroupedTrains[lineCode] = [];
                     }
+                    lineGroupedTrains[lineCode].push(...validUp, ...validDown);
                 });
 
-                if (validTrainList.length === 0) {
+                let finalTrainList = [];
+                for (let lCode in lineGroupedTrains) {
+                    finalTrainList.push(...lineGroupedTrains[lCode]);
+                }
+
+                if (finalTrainList.length === 0) {
                     container.innerHTML = `
                         <div class="text-center py-8 text-amber-400 text-xs font-bold">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
@@ -748,9 +752,9 @@
                     return;
                 }
 
-                validTrainList.sort((a, b) => new Date(a.time) - new Date(b.time));
+                finalTrainList.sort((a, b) => new Date(a.time) - new Date(b.time));
 
-                container.innerHTML = validTrainList.slice(0, 6).map(t => {
+                container.innerHTML = finalTrainList.map(t => {
                     const destName = mtrStationNames[t.dest] || t.dest;
                     const plat = t.plat || '1';
                     const lineName = mtrData[t.lineCode] ? mtrData[t.lineCode].name : t.lineCode;
@@ -762,12 +766,12 @@
                     let statusText = `${minutesLeft} 分鐘`;
                     let isSpecialState = false;
 
-                    // 到站最後30秒：即將抵達 (1s ~ 30s)
+                    // 最後 1 分鐘 (1s ~ 30s) 顯示「即將抵達」
                     if (diffSec > 0 && diffSec <= 30) {
                         statusText = "即將抵達";
                         isSpecialState = true;
                     } 
-                    // 到達後0-30秒 (-30s ~ 0s)：正在離開
+                    // 過站 0 至 30 秒 (-30s ~ 0s) 顯示「正在離開」
                     else if (diffSec <= 0 && diffSec >= -30) {
                         statusText = "正在離開";
                         isSpecialState = true;
@@ -1398,7 +1402,7 @@
             }
         }
 
-        // 優化2: MTR收藏僅顯示車站名稱（移除路線名）並且字體加大 2px (text-[10px] -> text-xs)
+        // MTR 收藏僅顯示車站名稱（字體放大 2px -> text-xs）
         function renderFavorites() {
             const section = document.getElementById('favoritesSection');
             const title = document.getElementById('favFooterTitle');
@@ -1432,7 +1436,7 @@
                 section.innerHTML = mtrFavorites.map((f, idx) => {
                     const stName = mtrStationNames[f.station] || f.station;
                     return `
-                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-purple-500/50 rounded-xl p-2 min-w-[90px] max-w-[120px] cursor-pointer shrink-0 transition flex items-center justify-between gap-1">
+                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-purple-500/50 rounded-xl p-2 min-w-[90px] max-w-[130px] cursor-pointer shrink-0 transition flex items-center justify-between gap-1.5 shadow-sm">
                             <div class="text-xs text-slate-100 truncate font-black">${stName}站</div>
                             <button onclick="event.stopPropagation(); removeMtrFavorite(${idx})" class="text-slate-500 hover:text-rose-400 p-0.5 shrink-0"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                         </div>
@@ -1938,7 +1942,7 @@
 
                 chatBox.innerHTML += `
                     <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        查詢失敗: ${err.message || '請檢查 API Key 是否正確或網路狀態'}
+                        連線失敗，請檢查 API Key 或網路連線。
                     </div>
                 `;
             }
