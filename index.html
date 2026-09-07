@@ -409,7 +409,6 @@
     </div>
 
     <script>
-        // MTR Lines and Stations Dataset
         const mtrData = {
             "KTL": { name: "觀塘綫", stations: [{ code: "WHA", name: "黃埔" }, { code: "HOM", name: "何文田" }, { code: "YMT", name: "油麻地" }, { code: "MOK", name: "旺角" }, { code: "PRE", name: "太子" }, { code: "SKM", name: "石硤尾" }, { code: "KOT", name: "九龍塘" }, { code: "LOF", name: "樂富" }, { code: "WTS", name: "黃大仙" }, { code: "DIH", name: "鑽石山" }, { code: "CHH", name: "彩虹" }, { code: "KOB", name: "九龍灣" }, { code: "NTK", name: "牛頭角" }, { code: "KWT", name: "觀塘" }, { code: "LAT", name: "藍田" }, { code: "YAT", name: "油塘" }, { code: "TIK", name: "調景嶺" }] },
             "ISL": { name: "港島綫", stations: [{ code: "KET", name: "堅尼地城" }, { code: "HKU", name: "香港大學" }, { code: "SYP", name: "西營盤" }, { code: "SHW", name: "上環" }, { code: "CEN", name: "中環" }, { code: "ADM", name: "金鐘" }, { code: "WAC", name: "灣仔" }, { code: "CAB", name: "銅鑼灣" }, { code: "TIH", name: "天后" }, { code: "FOH", name: "炮台山" }, { code: "NOP", name: "北角" }, { code: "QUB", name: "鰂魚涌" }, { code: "TAK", name: "太古" }, { code: "SWH", name: "西灣河" }, { code: "SKW", name: "筲箕灣" }, { code: "HFC", name: "杏花邨" }, { code: "CHW", name: "柴灣" }] },
@@ -663,7 +662,7 @@
             fetchMtrETA();
         }
 
-        // 嚴格過濾與到站邏輯重構
+        // 修正點 1, 2, 3: 總站取4個班次、0分鐘變即時抵達、金鐘站全選過濾與一般站各2班限制
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
 
@@ -687,6 +686,28 @@
                 return;
             }
 
+            // 判斷是否為總站 (Terminal Station) 檢查邏輯
+            const isTerminalStation = (stationCode) => {
+                const terminals = {
+                    "KTL": ["WHA", "TIK"],
+                    "ISL": ["KET", "CHW"],
+                    "TWL": ["CEN", "TSW"],
+                    "SIL": ["ADM", "SOH"],
+                    "TCL": ["HOK", "TOC"],
+                    "EAL": ["ADM", "LOW", "LMC"],
+                    "TML": ["WKS", "TUM"],
+                    "TKL": ["NOP", "LHP", "POA"],
+                    "AEL": ["HOK", "AWE"],
+                    "DRL": ["SUN", "DIS"]
+                };
+                for (let line in terminals) {
+                    if (terminals[line].includes(stationCode)) return true;
+                }
+                return false;
+            };
+
+            const isCurrentStationTerminal = isTerminalStation(selectedMtrStation);
+
             try {
                 const fetchPromises = activeLines.map(lineCode =>
                     fetch(`https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${lineCode}&sta=${selectedMtrStation}`)
@@ -696,7 +717,7 @@
                 );
 
                 const results = await Promise.all(fetchPromises);
-                let lineGroupedTrains = {};
+                let groupedTrains = {};
 
                 results.forEach(({ lineCode, data }) => {
                     if (!data || data.status === 0 || !data.data) return;
@@ -709,37 +730,42 @@
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
                     upTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
-                    downTrains.sort((a, b) => new Date(b.time) - new Date(a.time));
+                    downTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
 
                     const now = new Date();
-                    
-                    // 獨立處理各方向，嚴格限制一般車站來回各 2 班
-                    let processDirectionTrains = (trains) => {
+
+                    // 處理各方向班次限制 (修正 1 & 3)
+                    // 若為金鐘站等「全部」篩選，或一般車站：依規定分別取方向最快到站班次
+                    const maxCountPerDirection = isCurrentStationTerminal ? 4 : 2;
+
+                    const processDirectionTrains = (trains) => {
                         let valid = [];
-                        for (let t of trains) {
+                        trains.forEach(t => {
                             if (t.time) {
                                 const arrivalTime = new Date(t.time.replace(/-/g, '/'));
                                 const diffSec = Math.floor((arrivalTime - now) / 1000);
-                                if (diffSec >= -30) { // 超過 30 秒過站自動過濾
+                                if (diffSec >= -30) {
                                     valid.push({ ...t, diffSec });
                                 }
                             }
-                        }
-                        return valid.slice(0, 2); // 嚴格控制每方向最多 2 班
+                        });
+                        return valid.slice(0, maxCountPerDirection);
                     };
 
-                    let validUp = processDirectionTrains(upTrains);
-                    let validDown = processDirectionTrains(downTrains);
+                    const validUp = processDirectionTrains(upTrains);
+                    const validDown = processDirectionTrains(downTrains);
 
-                    if (!lineGroupedTrains[lineCode]) {
-                        lineGroupedTrains[lineCode] = [];
+                    if (!groupedTrains[lineCode]) {
+                        groupedTrains[lineCode] = [];
                     }
-                    lineGroupedTrains[lineCode].push(...validUp, ...validDown);
+                    groupedTrains[lineCode].push(...validUp, ...validDown);
                 });
 
                 let finalTrainList = [];
-                for (let lCode in lineGroupedTrains) {
-                    finalTrainList.push(...lineGroupedTrains[lCode]);
+                for (let line in groupedTrains) {
+                    groupedTrains[line].sort((a, b) => new Date(a.time) - new Date(b.time));
+                    // 修正 3：一般車站單一路線限制最多顯示來回最快各2班（總共最多4班或合符要求），金鐘站全部則展示各路綫相應班次
+                    finalTrainList.push(...groupedTrains[line]);
                 }
 
                 if (finalTrainList.length === 0) {
@@ -751,8 +777,6 @@
                     `;
                     return;
                 }
-
-                finalTrainList.sort((a, b) => new Date(a.time) - new Date(b.time));
 
                 container.innerHTML = finalTrainList.map(t => {
                     const destName = mtrStationNames[t.dest] || t.dest;
@@ -766,12 +790,11 @@
                     let statusText = `${minutesLeft} 分鐘`;
                     let isSpecialState = false;
 
-                    // 最後 1 分鐘 (1s ~ 30s) 顯示「即將抵達」
-                    if (diffSec > 0 && diffSec <= 30) {
+                    // 修正 2：到站最後 1 分鐘（小於等於 60 秒）時顯示「即將抵達」而非 0 分鐘
+                    if (diffSec > 0 && diffSec <= 60) {
                         statusText = "即將抵達";
                         isSpecialState = true;
                     } 
-                    // 過站 0 至 30 秒 (-30s ~ 0s) 顯示「正在離開」
                     else if (diffSec <= 0 && diffSec >= -30) {
                         statusText = "正在離開";
                         isSpecialState = true;
@@ -989,10 +1012,7 @@
             }
 
             const allRoutes = Array.from(routeMap.keys()).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-            
-            const matchedRoutes = allRoutes
-                .filter(r => r.toUpperCase().startsWith(query))
-                .slice(0, 150);
+            const matchedRoutes = allRoutes.filter(r => r.toUpperCase().startsWith(query)).slice(0, 150);
 
             if (matchedRoutes.length === 0) {
                 dropdown.innerHTML = '<div class="p-2.5 text-xs text-slate-500 text-center">沒有找到相關路線</div>';
@@ -1326,7 +1346,7 @@
                     }
 
                     let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
-                    if (diffSec > 0 && diffSec <= 30) {
+                    if (diffSec > 0 && diffSec <= 60) {
                         timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將抵達</span>`;
                     } else if (diffSec <= 0) {
                         timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將到達</span>`;
@@ -1402,7 +1422,6 @@
             }
         }
 
-        // MTR 收藏僅顯示車站名稱（字體放大 2px -> text-xs）
         function renderFavorites() {
             const section = document.getElementById('favoritesSection');
             const title = document.getElementById('favFooterTitle');
@@ -1436,7 +1455,7 @@
                 section.innerHTML = mtrFavorites.map((f, idx) => {
                     const stName = mtrStationNames[f.station] || f.station;
                     return `
-                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-purple-500/50 rounded-xl p-2 min-w-[90px] max-w-[130px] cursor-pointer shrink-0 transition flex items-center justify-between gap-1.5 shadow-sm">
+                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-purple-500/50 rounded-xl p-2 min-w-[90px] max-w-[120px] cursor-pointer shrink-0 transition flex items-center justify-between gap-1">
                             <div class="text-xs text-slate-100 truncate font-black">${stName}站</div>
                             <button onclick="event.stopPropagation(); removeMtrFavorite(${idx})" class="text-slate-500 hover:text-rose-400 p-0.5 shrink-0"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                         </div>
@@ -1660,8 +1679,8 @@
                         }
 
                         const matchedRouteCandidates = [];
-
                         const nearbyKmbStopsMap = new Map();
+
                         if (kmbAllStopsCache) {
                             kmbAllStopsCache.forEach(s => {
                                 const lat = parseFloat(s.lat);
@@ -1939,10 +1958,9 @@
             } catch (err) {
                 const loadEl = document.getElementById(loadingId);
                 if (loadEl) loadEl.remove();
-
                 chatBox.innerHTML += `
                     <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        連線失敗，請檢查 API Key 或網路連線。
+                        發生錯誤：${err.message}
                     </div>
                 `;
             }
