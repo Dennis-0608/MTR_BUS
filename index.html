@@ -67,7 +67,7 @@
                 
                 <!-- Bus / MTR Toggle -->
                 <div class="bg-slate-950 p-1 rounded-xl flex items-center shrink-0 border border-slate-800">
-                    <button id="btn-bus" onclick="switchMode('bus')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-blue-600 text-white shadow-sm">
+                    <button id="btn-bus" onclick="switchMode('bus')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-hkbus text-white shadow-sm">
                         <i class="fa-solid fa-bus"></i>
                         <span>巴士</span>
                     </button>
@@ -95,7 +95,7 @@
             <!-- Row 2: Search Buttons & Last Update Time -->
             <div id="busNavActions" class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
                 <div class="flex items-center gap-1.5 flex-1">
-                    <button onclick="openSearchModal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
+                    <button onclick="openSearchModal()" class="flex-1 bg-hkbus hover:opacity-90 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <span>搜尋路線</span>
                     </button>
@@ -115,7 +115,7 @@
 
             <!-- MTR Refresh Bar -->
             <div id="mtrNavActions" class="flex items-center justify-between pt-1 border-t border-slate-800/80 hidden">
-                <span class="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                <span class="text-xs font-bold text-hkmtr flex items-center gap-1.5">
                     <i class="fa-solid fa-train-subway"></i>
                     <span>港鐵即時班次預報</span>
                 </span>
@@ -137,7 +137,7 @@
                 <div id="activeStopCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col gap-1.5 shrink-0">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 overflow-hidden">
-                            <span id="displayCompanyTag" class="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">九巴 (KMB)</span>
+                            <span id="displayCompanyTag" class="bg-kmb text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">九巴 (KMB)</span>
                             <span id="displayRouteSeq" class="hidden">路線 --</span>
                             <p id="displayBoundInfo" class="text-xs sm:text-sm font-bold text-indigo-400 truncate">請點擊上方的搜尋或 GPS 按鈕</p>
                         </div>
@@ -160,7 +160,7 @@
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 shrink-0">
                         <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                            <i class="fa-regular fa-clock text-rose-500 text-sm"></i>
+                            <i class="fa-regular fa-clock text-kmb text-sm"></i>
                             <span>即時到站預報 (ETA)</span>
                         </h3>
                         <span class="text-[10px] text-slate-500">數據源: data.gov.hk</span>
@@ -181,12 +181,12 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 mb-1">選擇路線：</label>
-                            <select id="mtrLineSelect" onchange="onMtrLineChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 text-xs font-bold">
+                            <select id="mtrLineSelect" onchange="onMtrLineChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-hkmtr text-xs font-bold">
                             </select>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 mb-1">選擇車站：</label>
-                            <select id="mtrStationSelect" onchange="onMtrStationChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 text-xs font-bold">
+                            <select id="mtrStationSelect" onchange="onMtrStationChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-hkmtr text-xs font-bold">
                             </select>
                         </div>
                     </div>
@@ -198,14 +198,14 @@
                     <!-- Station Name & Favorite Button -->
                     <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 mb-2.5 shrink-0">
                         <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-train-subway text-indigo-400 text-lg"></i>
+                            <i class="fa-solid fa-train-subway text-hkmtr text-lg"></i>
                             <h2 id="mtrDisplayStationName" class="text-lg font-black text-white">請先選擇車站</h2>
                         </div>
                         <div id="mtrFavActionArea" class="flex items-center gap-1.5 hidden">
                             <button id="mtrFavBtn" onclick="toggleMtrFavorite()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-3 py-1 rounded-lg text-xs transition">
                                 收藏
                             </button>
-                            <button id="mtrDelBtn" onclick="deleteMtrFavorite()" class="bg-rose-600 hover:bg-rose-700 text-white font-black px-3 py-1 rounded-lg text-xs transition hidden">
+                            <button id="mtrDelBtn" onclick="deleteMtrFavorite()" class="bg-kmb hover:opacity-90 text-white font-black px-3 py-1 rounded-lg text-xs transition hidden">
                                 刪除
                             </button>
                         </div>
@@ -246,7 +246,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-route text-indigo-400"></i>
+                    <i class="fa-solid fa-route text-hkbus"></i>
                     <span>全港巴士站點檢索</span>
                 </h3>
                 <button onclick="closeSearchModal()" class="text-slate-400 hover:text-white p-1 text-base">
@@ -256,7 +256,7 @@
             <div class="p-3.5 space-y-3 overflow-y-auto flex-1">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">巴士公司：</label>
-                    <select id="modalCompanySelect" onchange="onCompanySelectChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 text-xs">
+                    <select id="modalCompanySelect" onchange="onCompanySelectChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-hkbus text-xs">
                         <option value="kmb">九龍巴士 (KMB)</option>
                         <option value="ctb">城巴 (Citybus - CTB)</option>
                     </select>
@@ -264,14 +264,14 @@
                 <div class="relative">
                     <label class="block text-xs font-semibold text-slate-300 mb-1">選擇或輸入路線號碼：</label>
                     <div class="relative">
-                        <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, A11)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-indigo-500 text-sm" />
+                        <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, A11)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-hkbus text-sm" />
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
                     </div>
                     <div id="routeAutocompleteDropdown" class="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-56 overflow-y-auto shadow-2xl z-50 hidden"></div>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">行車方向：</label>
-                    <select id="modalBoundSelect" onchange="onBoundChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 text-xs">
+                    <select id="modalBoundSelect" onchange="onBoundChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-hkbus text-xs">
                         <option value="">-- 請先選擇路線 --</option>
                     </select>
                 </div>
@@ -279,7 +279,7 @@
                     <label id="modalStopHeaderCount" class="block text-xs font-semibold text-slate-300 mb-1">
                         該路線全線所有停靠站點：
                     </label>
-                    <select id="modalStopSelect" onchange="onStopDropdownChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 mb-2 focus:outline-none focus:border-indigo-500 text-xs">
+                    <select id="modalStopSelect" onchange="onStopDropdownChange()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 mb-2 focus:outline-none focus:border-hkbus text-xs">
                         <option value="">-- 請先選擇路線與行車方向 --</option>
                     </select>
                     <div id="modalStopList" class="bg-slate-950 border border-slate-800 rounded-xl p-2 max-h-40 overflow-y-auto space-y-1">
@@ -308,11 +308,11 @@
             </div>
             <div class="p-3 space-y-2.5 overflow-y-auto flex-1">
                 <div class="relative">
-                    <input type="text" id="changeStopSearchInput" oninput="filterChangeStops()" placeholder="搜尋本線車站名稱..." class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 pl-8 focus:outline-none focus:border-indigo-500 text-xs" />
+                    <input type="text" id="changeStopSearchInput" oninput="filterChangeStops()" placeholder="搜尋本線車站名稱..." class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 pl-8 focus:outline-none focus:border-hkbus text-xs" />
                     <i class="fa-solid fa-filter absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
                 </div>
                 <div>
-                    <select id="changeStopSelect" onchange="onQuickChangeStopSelect()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 text-xs"></select>
+                    <select id="changeStopSelect" onchange="onQuickChangeStopSelect()" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 focus:outline-none focus:border-hkbus text-xs"></select>
                 </div>
                 <div id="changeStopListContainer" class="bg-slate-950 border border-slate-800 rounded-xl p-2 max-h-52 overflow-y-auto space-y-1"></div>
             </div>
@@ -390,7 +390,7 @@
                     <button onclick="setGpsRadius(500)" id="radiusBtn500" class="gps-radius-btn bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg transition">500m</button>
                     <button onclick="setGpsRadius(1000)" id="radiusBtn1000" class="gps-radius-btn bg-slate-800 text-slate-300 hover:bg-emerald-600 hover:text-white text-[10px] font-bold px-2 py-0.5 rounded-lg transition">1km</button>
                 </div>
-                <button onclick="executeGpsSearch()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 flex items-center gap-1 transition">
+                <button onclick="executeGpsSearch()" class="bg-hkbus hover:opacity-90 text-white text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 flex items-center gap-1 transition">
                     <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
                     <span>刷新</span>
                 </button>
@@ -505,7 +505,7 @@
             const mtrViewContainer = document.getElementById('mtrViewContainer');
 
             if (mode === 'bus') {
-                btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-blue-600 text-white shadow-sm";
+                btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-hkbus text-white shadow-sm";
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
                 
                 busNavActions.classList.remove('hidden');
@@ -514,7 +514,7 @@
                 busViewContainer.classList.remove('hidden');
                 mtrViewContainer.classList.add('hidden');
             } else {
-                btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-purple-700 text-white shadow-sm";
+                btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-hkmtr text-white shadow-sm";
                 btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
                 
                 busNavActions.classList.add('hidden');
@@ -653,11 +653,11 @@
                     return `
                         <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
                             <div class="flex items-center gap-3">
-                                <span class="bg-purple-700 text-white font-extrabold text-xs px-2.5 py-1 rounded-md shrink-0">
+                                <span class="bg-hkmtr text-white font-extrabold text-xs px-2.5 py-1 rounded-md shrink-0">
                                     ${lineName}
                                 </span>
                                 <div class="flex items-center gap-1.5">
-                                    <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                                    <span class="w-5 h-5 rounded-full bg-hkbus text-white font-bold text-[11px] flex items-center justify-center shrink-0">
                                         ${plat}
                                     </span>
                                     <span class="font-black text-sm text-slate-100">往 ${destName}</span>
@@ -675,7 +675,7 @@
             } catch (err) {
                 console.error("MTR Fetch error:", err);
                 container.innerHTML = `
-                    <div class="text-center py-8 text-rose-400 text-xs">
+                    <div class="text-center py-8 text-kmb text-xs">
                         <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
                         <p>更新列車資訊失敗，請刷新重試</p>
                     </div>
@@ -883,7 +883,7 @@
 
                 return `
                     <div onclick="selectRouteFromDropdown('${r}')" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800/50 flex items-center justify-between gap-2">
-                        <span class="font-extrabold text-indigo-400 text-sm shrink-0">${r}</span>
+                        <span class="font-extrabold text-hkbus text-sm shrink-0">${r}</span>
                         <span class="text-xs text-slate-400 truncate text-right flex-1">${termInfo}</span>
                     </div>
                 `;
@@ -986,7 +986,7 @@
             const stopListContainer = document.getElementById('modalStopList');
             if (!quiet) {
                 stopSelect.innerHTML = '<option value="">正在下載全線車站...</option>';
-                stopListContainer.innerHTML = '<div class="text-center py-4 text-xs text-indigo-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i>下載車站清單中...</div>';
+                stopListContainer.innerHTML = '<div class="text-center py-4 text-xs text-hkbus"><i class="fa-solid fa-spinner fa-spin mr-1"></i>下載車站清單中...</div>';
             }
 
             currentRouteStops = [];
@@ -1012,7 +1012,7 @@
                 if (rawStops.length === 0) {
                     if (!quiet) {
                         stopSelect.innerHTML = '<option value="">找不到車站資料</option>';
-                        stopListContainer.innerHTML = '<p class="text-xs text-rose-400 text-center py-3">此方向暫無車站資料</p>';
+                        stopListContainer.innerHTML = '<p class="text-xs text-kmb text-center py-3">此方向暫無車站資料</p>';
                     }
                     return;
                 }
@@ -1070,7 +1070,7 @@
                 console.error("Failed fetching stops:", err);
                 if (!quiet) {
                     stopSelect.innerHTML = '<option value="">下載車站失敗</option>';
-                    stopListContainer.innerHTML = '<p class="text-xs text-rose-400 text-center py-3">下載失敗，請重試</p>';
+                    stopListContainer.innerHTML = '<p class="text-xs text-kmb text-center py-3">下載失敗，請重試</p>';
                 }
             }
         }
@@ -1113,10 +1113,10 @@
             const stopNameEl = document.getElementById('displayStopName');
 
             if (currentActiveStop.company === 'kmb') {
-                companyTag.className = "bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
+                companyTag.className = "bg-kmb text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
                 companyTag.textContent = "九巴 (KMB)";
             } else {
-                companyTag.className = "bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
+                companyTag.className = "bg-ctb text-slate-950 text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
                 companyTag.textContent = "城巴 (CTB)";
             }
 
@@ -1135,7 +1135,7 @@
             refreshTimeEl.textContent = now.toLocaleTimeString('zh-HK', { hour12: false });
 
             container.innerHTML = `
-                <div class="text-center py-6 text-indigo-400 text-xs">
+                <div class="text-center py-6 text-hkbus text-xs">
                     <i class="fa-solid fa-spinner fa-spin mr-1.5 text-base"></i>正在讀取最新即時班次...
                 </div>
             `;
@@ -1199,7 +1199,7 @@
 
                     let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
                     if (diffMins === 0 || diffMins <= 1) {
-                        timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將到達</span>`;
+                        timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-kmb/30 border border-kmb text-rose-400 font-bold text-xs">即將到達</span>`;
                     }
 
                     let remark = item.rmk_tc || item.remark_tc || '實時班次';
@@ -1229,7 +1229,7 @@
             } catch (err) {
                 console.error("ETA Fetch error:", err);
                 container.innerHTML = `
-                    <div class="text-center py-6 text-rose-400 text-xs">
+                    <div class="text-center py-6 text-kmb text-xs">
                         <i class="fa-solid fa-triangle-exclamation mb-1 text-base"></i>
                         <p>載入即時預報失敗，請點擊更新按鈕重試</p>
                     </div>
@@ -1284,7 +1284,7 @@
                 }
 
                 section.innerHTML = favorites.map((f, idx) => {
-                    const compBadge = f.company === 'kmb' ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">九巴</span>' : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded">城巴</span>';
+                    const compBadge = f.company === 'kmb' ? '<span class="bg-kmb text-white text-[9px] font-black px-1.5 py-0.5 rounded">九巴</span>' : '<span class="bg-ctb text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded">城巴</span>';
                     return `
                         <div onclick="loadFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-xl p-2 min-w-[140px] max-w-[180px] cursor-pointer shrink-0 transition flex flex-col gap-1">
                             <div class="flex items-center justify-between">
@@ -1306,9 +1306,9 @@
                     const lineName = mtrData[f.line] ? mtrData[f.line].name : f.line;
                     const stName = mtrStationNames[f.station] || f.station;
                     return `
-                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-purple-500/50 rounded-xl p-2 min-w-[140px] max-w-[180px] cursor-pointer shrink-0 transition flex flex-col gap-1">
+                        <div onclick="loadMtrFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-hkmtr/50 rounded-xl p-2 min-w-[140px] max-w-[180px] cursor-pointer shrink-0 transition flex flex-col gap-1">
                             <div class="flex items-center justify-between">
-                                <span class="bg-purple-800 text-white text-[9px] font-black px-1.5 py-0.5 rounded">${lineName}</span>
+                                <span class="bg-hkmtr text-white text-[9px] font-black px-1.5 py-0.5 rounded">${lineName}</span>
                                 <button onclick="event.stopPropagation(); removeMtrFavorite(${idx})" class="text-slate-500 hover:text-rose-400 p-0.5"><i class="fa-solid fa-xmark text-xs"></i></button>
                             </div>
                             <div class="text-[11px] text-slate-100 truncate font-black">${stName}站</div>
@@ -1484,7 +1484,7 @@
 
             if (!("geolocation" in navigator)) {
                 container.innerHTML = `
-                    <div class="text-center py-10 text-rose-400 text-xs">
+                    <div class="text-center py-10 text-kmb text-xs">
                         <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
                         <p>您的裝置不支援 GPS 定位服務</p>
                     </div>
@@ -1631,8 +1631,8 @@
 
                         container.innerHTML = sortedResults.map(item => {
                             const compBadge = item.company === 'kmb' 
-                                ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>' 
-                                : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
+                                ? '<span class="bg-kmb text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>' 
+                                : '<span class="bg-ctb text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
 
                             const distText = item.distance < 1000 ? `${item.distance} 米` : `${(item.distance / 1000).toFixed(1)} 公里`;
 
@@ -1662,7 +1662,7 @@
                     } catch (err) {
                         console.error("GPS search error:", err);
                         container.innerHTML = `
-                            <div class="text-center py-10 text-rose-400 text-xs">
+                            <div class="text-center py-10 text-kmb text-xs">
                                 <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
                                 <p>搜尋附近車站時發生錯誤，請重試</p>
                             </div>
@@ -1674,7 +1674,7 @@
                 (error) => {
                     isGpsSearching = false;
                     container.innerHTML = `
-                        <div class="text-center py-10 text-rose-400 text-xs">
+                        <div class="text-center py-10 text-kmb text-xs">
                             <i class="fa-solid fa-location-slash text-2xl mb-2 block text-slate-500"></i>
                             <p class="font-bold">無法存取您的 GPS 位置</p>
                             <p class="text-slate-400 mt-1">請在瀏覽器設定中開啟位置權限後重試</p>
