@@ -662,7 +662,7 @@
             fetchMtrETA();
         }
 
-        // 修正點 1, 2, 3: 總站取4個班次、0分鐘變即時抵達、金鐘站全選過濾與一般站各2班限制
+        // 精準修正後的 MTR 到站預報邏輯：嚴格確保來回方向各取最近2班，並按時間由近到遠排序
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
 
@@ -686,28 +686,6 @@
                 return;
             }
 
-            // 判斷是否為總站 (Terminal Station) 檢查邏輯
-            const isTerminalStation = (stationCode) => {
-                const terminals = {
-                    "KTL": ["WHA", "TIK"],
-                    "ISL": ["KET", "CHW"],
-                    "TWL": ["CEN", "TSW"],
-                    "SIL": ["ADM", "SOH"],
-                    "TCL": ["HOK", "TOC"],
-                    "EAL": ["ADM", "LOW", "LMC"],
-                    "TML": ["WKS", "TUM"],
-                    "TKL": ["NOP", "LHP", "POA"],
-                    "AEL": ["HOK", "AWE"],
-                    "DRL": ["SUN", "DIS"]
-                };
-                for (let line in terminals) {
-                    if (terminals[line].includes(stationCode)) return true;
-                }
-                return false;
-            };
-
-            const isCurrentStationTerminal = isTerminalStation(selectedMtrStation);
-
             try {
                 const fetchPromises = activeLines.map(lineCode =>
                     fetch(`https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${lineCode}&sta=${selectedMtrStation}`)
@@ -717,7 +695,8 @@
                 );
 
                 const results = await Promise.all(fetchPromises);
-                let groupedTrains = {};
+                let finalTrainList = [];
+                const now = new Date();
 
                 results.forEach(({ lineCode, data }) => {
                     if (!data || data.status === 0 || !data.data) return;
@@ -726,47 +705,36 @@
                     const scheduleData = data.data[key];
                     if (!scheduleData) return;
 
+                    // 獨立處理 UP 方向
                     const upTrains = (scheduleData.UP || []).map(t => ({ ...t, lineCode, dir: 'UP' }));
+                    // 獨立處理 DOWN 方向
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
-                    upTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
-                    downTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
-
-                    const now = new Date();
-
-                    // 處理各方向班次限制 (修正 1 & 3)
-                    // 若為金鐘站等「全部」篩選，或一般車站：依規定分別取方向最快到站班次
-                    const maxCountPerDirection = isCurrentStationTerminal ? 4 : 2;
-
-                    const processDirectionTrains = (trains) => {
+                    const processDirection = (trains) => {
                         let valid = [];
                         trains.forEach(t => {
                             if (t.time) {
                                 const arrivalTime = new Date(t.time.replace(/-/g, '/'));
                                 const diffSec = Math.floor((arrivalTime - now) / 1000);
                                 if (diffSec >= -30) {
-                                    valid.push({ ...t, diffSec });
+                                    valid.push({ ...t, diffSec, arrivalTime });
                                 }
                             }
                         });
-                        return valid.slice(0, maxCountPerDirection);
+                        // 按時間由近到遠排序
+                        valid.sort((a, b) => a.arrivalTime - b.arrivalTime);
+                        // 嚴格限制每個方向最多取最近的 2 個班次
+                        return valid.slice(0, 2);
                     };
 
-                    const validUp = processDirectionTrains(upTrains);
-                    const validDown = processDirectionTrains(downTrains);
+                    const validUp = processDirection(upTrains);
+                    const validDown = processDirection(downTrains);
 
-                    if (!groupedTrains[lineCode]) {
-                        groupedTrains[lineCode] = [];
-                    }
-                    groupedTrains[lineCode].push(...validUp, ...validDown);
+                    finalTrainList.push(...validUp, ...validDown);
                 });
 
-                let finalTrainList = [];
-                for (let line in groupedTrains) {
-                    groupedTrains[line].sort((a, b) => new Date(a.time) - new Date(b.time));
-                    // 修正 3：一般車站單一路線限制最多顯示來回最快各2班（總共最多4班或合符要求），金鐘站全部則展示各路綫相應班次
-                    finalTrainList.push(...groupedTrains[line]);
-                }
+                // 最終所有篩選出的列車統一按時間由近到遠排序
+                finalTrainList.sort((a, b) => a.arrivalTime - b.arrivalTime);
 
                 if (finalTrainList.length === 0) {
                     container.innerHTML = `
@@ -790,7 +758,7 @@
                     let statusText = `${minutesLeft} 分鐘`;
                     let isSpecialState = false;
 
-                    // 修正 2：到站最後 1 分鐘（小於等於 60 秒）時顯示「即將抵達」而非 0 分鐘
+                    // 最後 60 秒內顯示「即將抵達」
                     if (diffSec > 0 && diffSec <= 60) {
                         statusText = "即將抵達";
                         isSpecialState = true;
@@ -1948,22 +1916,19 @@
                     aiChatHistory.push({ role: 'model', parts: [{ text: reply }] });
 
                     chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-slate-700 text-slate-100 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
+                        <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
                             ${parseMarkdown(reply)}
                         </div>
                     `;
                 } else {
-                    throw new Error(data.error ? data.error.message : "API 回應格式錯誤");
+                    chatBox.innerHTML += `<div class="bg-rose-950 text-rose-300 p-2.5 rounded-2xl text-xs">AI 回應發生錯誤，請檢查 API Key 是否正確。</div>`;
                 }
             } catch (err) {
                 const loadEl = document.getElementById(loadingId);
                 if (loadEl) loadEl.remove();
-                chatBox.innerHTML += `
-                    <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        發生錯誤：${err.message}
-                    </div>
-                `;
+                chatBox.innerHTML += `<div class="bg-rose-950 text-rose-300 p-2.5 rounded-2xl text-xs">網絡連接失敗，請檢查網絡。</div>`;
             }
+
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
