@@ -491,7 +491,7 @@
 
         let selectedMtrLine = '';
         let selectedMtrStation = '';
-        let selectedMtrFilterLine = 'ALL'; // 當前選擇的路線篩選鍵 ('ALL' 表示全部)
+        let selectedMtrFilterLine = 'ALL';
 
         const hkDistricts = [
             { name: '尖沙咀', hkoName: '香港天文台', lat: 22.3019, lng: 114.1742 },
@@ -610,7 +610,6 @@
             document.getElementById('mtrDisplayStationName').textContent = `${stationName}站`;
             document.getElementById('mtrFavActionArea').classList.remove('hidden');
 
-            // 重設篩選器為全部，並建構該車站專屬的動態路線篩選按鈕
             selectedMtrFilterLine = 'ALL';
             renderMtrFilterButtons();
 
@@ -621,8 +620,6 @@
             mtrAutoRefreshTimer = setInterval(fetchMtrETA, 30000);
         }
 
-        // 動態生成路線篩選按鈕 (僅當途經路線 > 1 條時顯示，即轉車站)
-        // 優化點 3：統一設為固定寬度 w-[84px] 並居中顯示，確保南港島綫與其他路線視覺高度統一對齊
         function renderMtrFilterButtons() {
             const filterContainer = document.getElementById('mtrFilterContainer');
             if (!selectedMtrStation) {
@@ -641,7 +638,7 @@
 
             const isAllActive = (selectedMtrFilterLine === 'ALL');
             let buttonsHtml = `
-                <button onclick="setMtrLineFilter('ALL')" class="w-[84px] text-center py-1 rounded-lg text-xs font-black transition-all shrink-0 border ${
+                <button onclick="setMtrLineFilter('ALL')" class="px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 border ${
                     isAllActive 
                     ? 'bg-slate-100 text-slate-950 border-white shadow' 
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
@@ -657,13 +654,13 @@
 
                 if (isActive) {
                     buttonsHtml += `
-                        <button onclick="setMtrLineFilter('${lineCode}')" class="w-[84px] text-center py-1 rounded-lg text-xs font-black text-white shadow-sm transition-all shrink-0 border border-white scale-105" style="background-color: ${lineColor}">
+                        <button onclick="setMtrLineFilter('${lineCode}')" class="px-2.5 py-1 rounded-lg text-xs font-black text-white shadow-sm transition-all shrink-0 border border-white scale-105" style="background-color: ${lineColor}">
                             ${lineName}
                         </button>
                     `;
                 } else {
                     buttonsHtml += `
-                        <button onclick="setMtrLineFilter('${lineCode}')" class="w-[84px] text-center py-1 rounded-lg text-xs font-bold text-slate-300 opacity-70 hover:opacity-100 transition-all shrink-0 border border-transparent" style="background-color: ${lineColor}40">
+                        <button onclick="setMtrLineFilter('${lineCode}')" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300 opacity-70 hover:opacity-100 transition-all shrink-0 border border-transparent" style="background-color: ${lineColor}40">
                             ${lineName}
                         </button>
                     `;
@@ -673,7 +670,6 @@
             filterContainer.innerHTML = buttonsHtml;
         }
 
-        // 切換路線篩選狀態
         function setMtrLineFilter(lineCode) {
             selectedMtrFilterLine = lineCode;
             renderMtrFilterButtons();
@@ -705,7 +701,6 @@
             }
 
             try {
-                // 併發請求相關路線數據
                 const fetchPromises = activeLines.map(lineCode =>
                     fetch(`https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${lineCode}&sta=${selectedMtrStation}`)
                         .then(res => res.ok ? res.json() : null)
@@ -726,11 +721,9 @@
                     const upTrains = (scheduleData.UP || []).map(t => ({ ...t, lineCode, dir: 'UP' }));
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
-                    // 按抵達時間遞增排序
                     upTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
                     downTrains.sort((a, b) => new Date(a.time) - new Date(b.time));
 
-                    // 判斷是否為總站（單向服務或無列車進站）
                     const isTerminal = (upTrains.length === 0 || downTrains.length === 0);
 
                     if (isTerminal) {
@@ -760,32 +753,32 @@
                     const lineName = mtrData[t.lineCode] ? mtrData[t.lineCode].name : t.lineCode;
                     const lineColor = mtrLineColors[t.lineCode] || '#6b7280';
 
-                    let secondsLeft = 0;
                     let minutesLeft = 0;
-
+                    let diffSec = 0;
                     if (t.time) {
                         const now = new Date();
                         const arrivalTime = new Date(t.time.replace(/-/g, '/'));
-                        secondsLeft = Math.floor((arrivalTime - now) / 1000);
-                        minutesLeft = Math.max(0, Math.floor(secondsLeft / 60));
+                        diffSec = Math.floor((arrivalTime - now) / 1000);
+                        minutesLeft = Math.max(0, Math.floor(diffSec / 60));
                     }
 
                     let statusText = `${minutesLeft} 分鐘`;
                     let isArriving = false;
 
-                    // 優化點 1 & 2：精準判斷「正在離開」與「即將抵達」(<= 30 秒)
-                    if (secondsLeft <= 0 || t.ttnt === '0') {
-                        statusText = "正在離開";
-                        isArriving = true;
-                    } else if (secondsLeft <= 30 || t.ttnt === '1') {
+                    // 優化 1 & 2：到站時間邏輯判斷
+                    if (diffSec > 0 && diffSec <= 30) {
                         statusText = "即將抵達";
+                        isArriving = true;
+                    } else if (diffSec <= 0 || t.ttnt === '0' || t.ttnt === '1') {
+                        statusText = "正在離開";
                         isArriving = true;
                     }
 
+                    // 優化 3：路線名稱標籤設定固定寬度 (w-20 inline-block text-center) 保持整體版面整齊
                     return `
                         <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
                             <div class="flex items-center gap-3">
-                                <span class="text-white font-extrabold text-xs px-2.5 py-1 rounded-md shrink-0 shadow-sm" style="background-color: ${lineColor}">
+                                <span class="w-20 inline-block text-center text-white font-extrabold text-xs py-1 rounded-md shrink-0 shadow-sm" style="background-color: ${lineColor}">
                                     ${lineName}
                                 </span>
                                 <div class="flex items-center gap-1.5">
@@ -796,7 +789,7 @@
                                 </div>
                             </div>
                             <div class="text-right">
-                                <span class="font-black text-sm ${isArriving ? 'text-amber-400 font-bold' : 'text-emerald-400'}">
+                                <span class="font-black text-sm ${isArriving ? 'text-amber-400' : 'text-emerald-400'}">
                                     ${statusText}
                                 </span>
                             </div>
@@ -1325,13 +1318,18 @@
                 container.innerHTML = etas.slice(0, 4).map((item, idx) => {
                     const etaTimeStr = item.eta ? new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
                     let diffMins = '--';
+                    let diffSec = 0;
                     if (item.eta) {
                         const diffMs = new Date(item.eta) - new Date();
+                        diffSec = Math.floor(diffMs / 1000);
                         diffMins = Math.max(0, Math.floor(diffMs / 60000));
                     }
 
+                    // 優化 2：巴士 ETA 於 30 秒內時顯示「即將抵達」
                     let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
-                    if (diffMins === 0 || diffMins <= 1) {
+                    if (diffSec > 0 && diffSec <= 30) {
+                        timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將抵達</span>`;
+                    } else if (diffSec <= 0) {
                         timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將到達</span>`;
                     }
 
@@ -1633,7 +1631,6 @@
                     const userLng = position.coords.longitude;
 
                     try {
-                        // Load KMB Cache
                         if (!kmbAllStopsCache) {
                             const res = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop');
                             if (res.ok) {
@@ -1650,7 +1647,6 @@
                             }
                         }
 
-                        // Load CTB Cache
                         if (!ctbAllStopsCache) {
                             const res = await fetch('https://rt.data.gov.hk/v2/transport/citybus/stop/ctb');
                             if (res.ok) {
@@ -1661,7 +1657,6 @@
 
                         const matchedRouteCandidates = [];
 
-                        // Search Nearby KMB Stops
                         const nearbyKmbStopsMap = new Map();
                         if (kmbAllStopsCache) {
                             kmbAllStopsCache.forEach(s => {
@@ -1719,7 +1714,6 @@
                             });
                         }
 
-                        // Search Nearby CTB Stops
                         if (ctbAllStopsCache) {
                             for (const s of ctbAllStopsCache) {
                                 const lat = parseFloat(s.lat);
