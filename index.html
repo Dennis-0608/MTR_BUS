@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>香港巴士及地鐵到站預報 (完整修復升級版)</title>
+    <title>香港巴士及地鐵到站預報 (完整修復整合版)</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -92,7 +92,7 @@
 
             </div>
 
-            <!-- Row 2: Search Buttons & Last Update Time -->
+            <!-- Row 2: Bus Search Buttons & Refresh Time -->
             <div id="busNavActions" class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
                 <div class="flex items-center gap-1.5 flex-1">
                     <button onclick="openSearchModal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
@@ -241,7 +241,7 @@
 
     </div>
 
-    <!-- Modals -->
+    <!-- Modals (Bus Search, Change Stop, Gemini AI, GPS Search) -->
     <div id="busSearchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
@@ -622,7 +622,7 @@
                     scheduleData.DOWN.forEach(t => trainList.push({ ...t, dir: 'DOWN' }));
                 }
 
-                trainList.sort((a, b) => new Date(a.time.replace(/-/g, '/')) - new Date(b.time.replace(/-/g, '/')));
+                trainList.sort((a, b) => new Date(a.time) - new Date(b.time));
 
                 if (trainList.length === 0) {
                     container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">目前方向暫無即將到達的列車</div>`;
@@ -808,56 +808,24 @@
             return '⛅';
         }
 
-        // Optimized Initial Bus Data & Bulk Station Pre-caching
+        // Bus Initial Data Load (KMB & CTB Open Data)
         async function loadInitialBusData() {
             try {
-                const [kmbRes, ctbRes] = await Promise.all([
-                    fetch('https://data.etabus.gov.hk/v1/transport/kmb/route/'),
-                    fetch('https://rt.data.gov.hk/v2/transport/citybus/route/ctb')
-                ]);
-
+                const kmbRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route/');
                 if (kmbRes.ok) {
                     const kmbData = await kmbRes.json();
                     kmbRoutes = kmbData.data || [];
                 }
+
+                const ctbRes = await fetch('https://rt.data.gov.hk/v2/transport/citybus/route/ctb');
                 if (ctbRes.ok) {
                     const ctbData = await ctbRes.json();
                     ctbRoutes = ctbData.data || [];
                 }
 
                 buildRouteMap('kmb');
-
-                // Asynchronously pre-cache stops directory in bulk (solves lag)
-                preloadStopDirectories();
             } catch (err) {
                 console.error("Failed loading routes:", err);
-            }
-        }
-
-        async function preloadStopDirectories() {
-            try {
-                const [kmbStopsRes, ctbStopsRes] = await Promise.all([
-                    fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop'),
-                    fetch('https://rt.data.gov.hk/v2/transport/citybus/stop/ctb')
-                ]);
-
-                if (kmbStopsRes.ok) {
-                    const data = await kmbStopsRes.json();
-                    kmbAllStopsCache = data.data || [];
-                    kmbAllStopsCache.forEach(s => {
-                        if (s.stop) kmbStopsDirectory.set(s.stop, s.name_tc || s.name_en || s.stop);
-                    });
-                }
-
-                if (ctbStopsRes.ok) {
-                    const data = await ctbStopsRes.json();
-                    ctbAllStopsCache = data.data || [];
-                    ctbAllStopsCache.forEach(s => {
-                        if (s.stop) ctbStopsDirectory.set(s.stop, s.name_tc || s.name_en || s.stop);
-                    });
-                }
-            } catch (err) {
-                console.error("Preloading stop directories failed:", err);
             }
         }
 
@@ -1017,8 +985,8 @@
             const stopSelect = document.getElementById('modalStopSelect');
             const stopListContainer = document.getElementById('modalStopList');
             if (!quiet) {
-                stopSelect.innerHTML = '<option value="">正在載入全線車站...</option>';
-                stopListContainer.innerHTML = '<div class="text-center py-4 text-xs text-indigo-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i>讀取車站清單中...</div>';
+                stopSelect.innerHTML = '<option value="">正在下載全線車站...</option>';
+                stopListContainer.innerHTML = '<div class="text-center py-4 text-xs text-indigo-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i>下載車站清單中...</div>';
             }
 
             currentRouteStops = [];
@@ -1055,35 +1023,27 @@
                     let stopName = stopId;
 
                     if (currentCompany === 'kmb') {
-                        if (kmbStopsDirectory.has(stopId)) {
-                            stopName = kmbStopsDirectory.get(stopId);
-                        } else {
+                        if (!kmbStopsDirectory.has(stopId)) {
                             try {
                                 const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopId}`);
                                 if (sRes.ok) {
                                     const sData = await sRes.json();
-                                    if (sData?.data) {
-                                        stopName = sData.data.name_tc || sData.data.name_en || stopId;
-                                        kmbStopsDirectory.set(stopId, stopName);
-                                    }
+                                    if (sData && sData.data) kmbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
                                 }
                             } catch (e) {}
                         }
+                        stopName = kmbStopsDirectory.get(stopId) || stopId;
                     } else {
-                        if (ctbStopsDirectory.has(stopId)) {
-                            stopName = ctbStopsDirectory.get(stopId);
-                        } else {
+                        if (!ctbStopsDirectory.has(stopId)) {
                             try {
                                 const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stopId}`);
                                 if (sRes.ok) {
                                     const sData = await sRes.json();
-                                    if (sData?.data) {
-                                        stopName = sData.data.name_tc || sData.data.name_en || stopId;
-                                        ctbStopsDirectory.set(stopId, stopName);
-                                    }
+                                    if (sData && sData.data) ctbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
                                 }
                             } catch (e) {}
                         }
+                        stopName = ctbStopsDirectory.get(stopId) || stopId;
                     }
 
                     currentRouteStops.push({ seq: i + 1, stopId: stopId, name: stopName });
@@ -1474,7 +1434,7 @@
             `).join('');
         }
 
-        // Fully Fixed Dual-Company GPS Search Engine (KMB & CTB)
+        // Complete Dual-Company GPS Search Engine
         function openGpsSearchModal() {
             document.getElementById('gpsSearchModal').classList.remove('hidden');
             executeGpsSearch();
@@ -1567,7 +1527,7 @@
 
                         const matchedRouteCandidates = [];
 
-                        // 1. Search Nearby KMB Stops & Matches
+                        // Search Nearby KMB Stops
                         const nearbyKmbStopsMap = new Map();
                         if (kmbAllStopsCache) {
                             kmbAllStopsCache.forEach(s => {
@@ -1578,7 +1538,7 @@
                                     if (dist <= currentGpsRadius) {
                                         nearbyKmbStopsMap.set(s.stop, {
                                             stopId: s.stop,
-                                            name: s.name_tc || s.name_en || s.stop,
+                                            name: s.name_tc || s.name_en,
                                             distance: dist
                                         });
                                     }
@@ -1625,9 +1585,9 @@
                             });
                         }
 
-                        // 2. Search Nearby CTB Stops & Query Stop ETA for Active Routes
-                        const nearbyCtbStopsMap = new Map();
+                        // Search Nearby CTB Stops & Route ETAs
                         if (ctbAllStopsCache) {
+                            const nearbyCtbStops = [];
                             ctbAllStopsCache.forEach(s => {
                                 const lat = parseFloat(s.lat);
                                 const lng = parseFloat(s.long);
@@ -1636,44 +1596,46 @@
                                     if (dist <= currentGpsRadius) {
                                         const stopName = s.name_tc || s.name_en || s.stop;
                                         ctbStopsDirectory.set(s.stop, stopName);
-                                        nearbyCtbStopsMap.set(s.stop, {
-                                            stopId: s.stop,
-                                            name: stopName,
-                                            distance: dist
-                                        });
+                                        nearbyCtbStops.push({ stopId: s.stop, name: stopName, distance: dist });
                                     }
                                 }
                             });
-                        }
 
-                        if (nearbyCtbStopsMap.size > 0) {
-                            const ctbPromises = Array.from(nearbyCtbStopsMap.values()).map(async (stopObj) => {
+                            nearbyCtbStops.sort((a, b) => a.distance - b.distance);
+                            const topCtbStops = nearbyCtbStops.slice(0, 10);
+
+                            const ctbPromises = topCtbStops.map(async (st) => {
                                 try {
-                                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop-eta/ctb/${stopObj.stopId}`);
+                                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${st.stopId}`);
                                     if (res.ok) {
                                         const data = await res.json();
                                         const etaList = data.data || [];
+                                        const routeSeen = new Set();
                                         etaList.forEach(item => {
                                             let boundVal = item.dir;
                                             if (boundVal === 'O') boundVal = 'outbound';
                                             if (boundVal === 'I') boundVal = 'inbound';
-                                            if (!boundVal) boundVal = 'outbound';
-
-                                            matchedRouteCandidates.push({
-                                                company: 'ctb',
-                                                route: item.route,
-                                                bound: boundVal,
-                                                serviceType: '1',
-                                                stopId: stopObj.stopId,
-                                                stopName: stopObj.name,
-                                                seq: 1,
-                                                dest: item.dest_tc || item.dest_en || '目的車站',
-                                                orig: '',
-                                                distance: stopObj.distance
-                                            });
+                                            const key = `${item.route}_${boundVal}_${item.dest_tc}`;
+                                            if (!routeSeen.has(key)) {
+                                                routeSeen.add(key);
+                                                matchedRouteCandidates.push({
+                                                    company: 'ctb',
+                                                    route: item.route,
+                                                    bound: boundVal,
+                                                    serviceType: '1',
+                                                    stopId: st.stopId,
+                                                    stopName: st.name,
+                                                    seq: item.seq || 1,
+                                                    dest: item.dest_tc || item.dest_en || '目的車站',
+                                                    orig: '',
+                                                    distance: st.distance
+                                                });
+                                            }
                                         });
                                     }
-                                } catch (e) {}
+                                } catch (e) {
+                                    console.error("CTB stop query error:", e);
+                                }
                             });
                             await Promise.all(ctbPromises);
                         }
@@ -1690,7 +1652,6 @@
                             return;
                         }
 
-                        // Deduplicate Candidates by Route, Bound, Dest
                         const deduplicatedMap = new Map();
                         matchedRouteCandidates.forEach(item => {
                             const key = `${item.company}_${item.route}_${item.bound}_${item.dest}`;
@@ -1797,7 +1758,7 @@
             fetchStopsForSelectedRoute(true);
         }
 
-        // Gemini AI Assistant
+        // Gemini AI Assistant Integration
         function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
         function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
         function toggleApiKeyInput() {
