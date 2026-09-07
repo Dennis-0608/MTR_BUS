@@ -734,7 +734,7 @@
                     const upTrains = (scheduleData.UP || []).map(t => ({ ...t, lineCode, dir: 'UP' }));
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
-                    const processDirection = (trains) => {
+                    const processDirection = (trains, dir) => {
                         let valid = [];
                         trains.forEach(t => {
                             if (t.time) {
@@ -749,9 +749,15 @@
 
                         let takeCount = 2; // 預設顯示 2 個班次
 
-                        // 需求 1 & 2：優化東鐵線 (EAL) 邏輯，所有一般車站及大圍、九龍塘、紅磡、會展均顯示來回方向各 2 個班次
-                        if (lineCode === 'EAL') {
-                            takeCount = 2;
+                        // 精確定位：針對金鐘站往羅湖/落馬洲、羅湖往金鐘、落馬洲往金鐘的特定方向設定顯示 4 個班次
+                        const isAdmUpToLowLmc = (lineCode === 'EAL' && selectedMtrStation === 'ADM' && dir === 'UP');
+                        const isLowDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LOW' && dir === 'DOWN');
+                        const isLmcDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LMC' && dir === 'DOWN');
+
+                        if (isAdmUpToLowLmc || isLowDownToAdm || isLmcDownToAdm) {
+                            takeCount = 4;
+                        } else if (lineCode === 'EAL') {
+                            takeCount = 2; // 東鐵綫其他車站方向維持顯示 2 個班次
                         } else if (!isInterchange && !isTermInThisLine) {
                             takeCount = 2;
                         } else {
@@ -782,8 +788,8 @@
                         return valid.slice(0, takeCount);
                     };
 
-                    const validUp = processDirection(upTrains);
-                    const validDown = processDirection(downTrains);
+                    const validUp = processDirection(upTrains, 'UP');
+                    const validDown = processDirection(downTrains, 'DOWN');
 
                     finalTrainList.push(...validUp, ...validDown);
                 });
@@ -1965,11 +1971,11 @@
                 const data = await res.json();
                 const loadElem = document.getElementById(loadingId);
 
-                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                if (data.candidates && data.candidates[0]?.content?.parts[0]) {
                     const aiReply = data.candidates[0].content.parts[0].text;
                     if (loadElem) {
                         loadElem.outerHTML = `
-                            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
+                            <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow-sm">
                                 ${parseMarkdown(aiReply)}
                             </div>
                         `;
@@ -1977,19 +1983,18 @@
                 } else {
                     if (loadElem) {
                         loadElem.outerHTML = `
-                            <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
-                                API 回覆格式錯誤，請檢查 API Key 是否正確。
+                            <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                                AI 回覆失敗，請檢查 API Key 是否正確。
                             </div>
                         `;
                     }
                 }
             } catch (err) {
-                console.error("AI Assistant error:", err);
                 const loadElem = document.getElementById(loadingId);
                 if (loadElem) {
                     loadElem.outerHTML = `
-                        <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
-                            連線失敗，請檢查網路或 API Key 配置。
+                        <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                            網路連線失敗，請稍後重試。
                         </div>
                     `;
                 }
