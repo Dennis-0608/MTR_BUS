@@ -185,7 +185,6 @@
                             <div class="flex items-center gap-2 overflow-hidden">
                                 <i class="fa-solid fa-train-subway text-indigo-400 text-lg shrink-0"></i>
                                 <h2 id="mtrDisplayStationName" class="text-lg font-black text-white truncate">請先選擇車站</h2>
-                                <!-- 需求3：當前車站若已收藏，顯示已收藏標記 -->
                                 <span id="mtrStationFavBadge" class="hidden bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
                                     <i class="fa-solid fa-star text-[9px]"></i>已收藏
                                 </span>
@@ -631,7 +630,6 @@
                 return;
             }
 
-            // 需求2：隱藏「會展站」(EXC) 中的篩選按鈕
             if (selectedMtrStation === 'EXC') {
                 filterContainer.classList.add('hidden');
                 return;
@@ -751,7 +749,10 @@
 
                         let takeCount = 2; // 預設顯示 2 個班次
 
-                        if (!isInterchange && !isTermInThisLine) {
+                        // 需求 1 & 2：優化東鐵線 (EAL) 邏輯，所有一般車站及大圍、九龍塘、紅磡、會展均顯示來回方向各 2 個班次
+                        if (lineCode === 'EAL') {
+                            takeCount = 2;
+                        } else if (!isInterchange && !isTermInThisLine) {
                             takeCount = 2;
                         } else {
                             const isExcludedTerminal = ["NOP", "ADM", "TIK"].includes(selectedMtrStation);
@@ -765,19 +766,15 @@
                             else if (selectedMtrStation === 'TIK' && trains.some(t => t.dest === 'WHA')) {
                                 takeCount = 4;
                             }
-                            else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'LOW' || t.dest === 'LMC' || t.dest === 'SOH')) {
+                            else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'SOH')) {
                                 takeCount = 4;
                             }
                         }
 
-                        // 需求1: 將羅湖往金鐘方向, 康城往北角/調景嶺方向的轉為顯示最近的4個班次
+                        // 特定方向多班次特別過濾邏輯 (康城往北角/調景嶺顯示 4 個班次)
                         if (trains.length > 0) {
-                            // 判定是否為 羅湖/落馬洲 開往 金鐘 方向 (東鐵綫 DOWN 方向往 ADM)
-                            const isLoWuToAdmiralty = (lineCode === 'EAL' && (selectedMtrStation === 'LOW' || selectedMtrStation === 'LMC' || trains.some(t => t.dest === 'ADM')));
-                            // 判定是否為 康城 開往 北角 或 調景嶺 方向 (將軍澳綫 LHP 往 NOP/TIK)
                             const isLOHASToNorthPointOrTiuKengLeng = (lineCode === 'TKL' && selectedMtrStation === 'LHP' && trains.some(t => t.dest === 'NOP' || t.dest === 'TIK'));
-
-                            if (isLoWuToAdmiralty || isLOHASToNorthPointOrTiuKengLeng) {
+                            if (isLOHASToNorthPointOrTiuKengLeng) {
                                 takeCount = 4;
                             }
                         }
@@ -803,7 +800,6 @@
                     return;
                 }
 
-                // 需求4：手機端調整，將中間紅框內（車票/路線/月台/到達時間）字體增加4px (text-xs/sm -> text-base/lg)
                 container.innerHTML = finalTrainList.map(t => {
                     const destName = mtrStationNames[t.dest] || t.dest;
                     const plat = t.plat || '1';
@@ -895,7 +891,7 @@
             if (isFav) {
                 favBtn.classList.add('hidden');
                 delBtn.classList.remove('hidden');
-                if (badge) badge.classList.remove('hidden'); // 需求3：車站已收藏則顯示標籤
+                if (badge) badge.classList.remove('hidden');
             } else {
                 favBtn.classList.remove('hidden');
                 delBtn.classList.add('hidden');
@@ -1954,47 +1950,49 @@
             try {
                 const stopContext = currentActiveStop ? `用戶目前正在查看 ${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route}號線，車站為「${currentActiveStop.stopName}」，目的地為 ${currentActiveStop.dest}。` : '用戶目前未選擇特定車站。';
                 
-                const systemInstruction = `你是一名資深的香港公共交通專家，廣泛精通香港巴士（九巴、城巴）、港鐵、渡輪與專線小巴路線編號、過海路線號碼與轉乘優惠。${stopContext} 請使用地道的香港繁體中文（如：屋邨、轉車站、搭車、落車、過海）簡明扼要地解答。`;
-
-                aiChatHistory.push({ role: 'user', parts: [{ text: text }] });
+                const systemInstruction = `你是一名資深的香港公共交通專家，廣廣東話為主要回答語言。`;
 
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        contents: aiChatHistory
+                        contents: [
+                            { role: 'user', parts: [{ text: `${systemInstruction}\n\n[當前環境數據]: ${stopContext}\n\n[用戶問題]: ${text}` }] }
+                        ]
                     })
                 });
 
                 const data = await res.json();
-                const loadEl = document.getElementById(loadingId);
-                if (loadEl) loadEl.remove();
+                const loadElem = document.getElementById(loadingId);
 
-                if (data.candidates && data.candidates[0].content.parts[0].text) {
-                    const reply = data.candidates[0].content.parts[0].text;
-                    aiChatHistory.push({ role: 'model', parts: [{ text: reply }] });
-
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-slate-700 text-slate-100 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            ${parseMarkdown(reply)}
-                        </div>
-                    `;
+                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    const aiReply = data.candidates[0].content.parts[0].text;
+                    if (loadElem) {
+                        loadElem.outerHTML = `
+                            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
+                                ${parseMarkdown(aiReply)}
+                            </div>
+                        `;
+                    }
                 } else {
-                    chatBox.innerHTML += `
-                        <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            AI 暫時無法回應，請檢查 API Key 是否正確。
+                    if (loadElem) {
+                        loadElem.outerHTML = `
+                            <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
+                                API 回覆格式錯誤，請檢查 API Key 是否正確。
+                            </div>
+                        `;
+                    }
+                }
+            } catch (err) {
+                console.error("AI Assistant error:", err);
+                const loadElem = document.getElementById(loadingId);
+                if (loadElem) {
+                    loadElem.outerHTML = `
+                        <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
+                            連線失敗，請檢查網路或 API Key 配置。
                         </div>
                     `;
                 }
-            } catch (err) {
-                const loadEl = document.getElementById(loadingId);
-                if (loadEl) loadEl.remove();
-                chatBox.innerHTML += `
-                    <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        連線失敗，請檢查網絡連線或 API Key。
-                    </div>
-                `;
             }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
