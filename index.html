@@ -77,7 +77,7 @@
                     </button>
                 </div>
 
-                <!-- Live Weather & District Badge (字體大小已增加 4px: 由 text-xs 提升至 text-base) -->
+                <!-- Live Weather & District Badge -->
                 <div id="weather-box" onclick="fetchWeatherAndLocation()" class="flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl text-base gap-1.5 shrink-0 cursor-pointer hover:border-slate-700 transition">
                     <span id="weatherIcon" class="text-xl">⛅</span>
                     <span id="weatherTemp" class="font-extrabold text-emerald-400 text-base sm:text-lg">--°C</span>
@@ -141,7 +141,8 @@
                         <div class="flex items-center gap-2 overflow-hidden">
                             <span id="displayCompanyTag" class="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">九巴 (KMB)</span>
                             <span id="displayRouteSeq" class="hidden">路線 --</span>
-                            <p id="displayBoundInfo" class="text-xs sm:text-sm font-bold text-indigo-400 truncate">請點擊上方的搜尋或 GPS 按鈕</p>
+                            <!-- 字體增加 4px (由 text-xs sm:text-sm 調整為 text-base) -->
+                            <p id="displayBoundInfo" class="text-base font-bold text-indigo-400 truncate">請點擊上方的搜尋或 GPS 按鈕</p>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button id="favBtn" onclick="toggleFavorite()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 transition text-xs">
@@ -161,16 +162,17 @@
 
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 shrink-0">
-                        <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                            <i class="fa-regular fa-clock text-rose-500 text-sm"></i>
+                        <!-- 標題字體增加 4px (由 text-xs 提升至 text-base) -->
+                        <h3 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-regular fa-clock text-rose-500 text-base"></i>
                             <span>即時到站預報 (ETA)</span>
                         </h3>
-                        <span class="text-[10px] text-slate-500">數據源: data.gov.hk</span>
+                        <span class="text-xs text-slate-400">數據源: data.gov.hk</span>
                     </div>
                     <div id="etaListContainer" class="flex-1 flex flex-col justify-start gap-2 overflow-y-auto no-scrollbar py-0.5">
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-bus text-3xl mb-2 block text-slate-700"></i>
-                            <p class="text-xs">請點擊上方「搜尋路線」或「GPS搜尋」選擇車站</p>
+                            <p class="text-sm">請點擊上方「搜尋路線」或「GPS搜尋」選擇車站</p>
                         </div>
                     </div>
                 </div>
@@ -551,6 +553,12 @@
                 aiTriggerBtn.classList.remove('hidden');
                 busViewContainer.classList.remove('hidden');
                 mtrViewContainer.classList.add('hidden');
+
+                if (currentActiveStop) {
+                    fetchRealTimeETA();
+                    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                    autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
+                }
             } else {
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-purple-700 text-white shadow-sm";
                 btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
@@ -615,7 +623,6 @@
             updateMtrFavButtonState();
             fetchMtrETA();
 
-            // 定時更新為每 30 秒 (30000 毫秒) 次
             if (mtrAutoRefreshTimer) clearInterval(mtrAutoRefreshTimer);
             mtrAutoRefreshTimer = setInterval(fetchMtrETA, 30000);
         }
@@ -1271,6 +1278,7 @@
             renderActiveStopDashboard();
             fetchRealTimeETA();
 
+            // 設定 30 秒自動更新預報
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
             autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 30000);
         }
@@ -1303,12 +1311,6 @@
             const refreshTimeEl = document.getElementById('etaRefreshTime');
             const now = new Date();
             refreshTimeEl.textContent = now.toLocaleTimeString('zh-HK', { hour12: false });
-
-            container.innerHTML = `
-                <div class="text-center py-6 text-indigo-400 text-xs">
-                    <i class="fa-solid fa-spinner fa-spin mr-1.5 text-base"></i>正在讀取最新即時班次...
-                </div>
-            `;
 
             try {
                 let etas = [];
@@ -1352,8 +1354,8 @@
                     container.innerHTML = `
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
-                            <p class="text-xs font-bold text-slate-300">暫時沒有此方向的即時班次資料</p>
-                            <p class="text-[10px] text-slate-500 mt-1">可能非服務時間或尾班車已過</p>
+                            <p class="text-sm font-bold text-slate-300">暫時沒有此方向的即時班次資料</p>
+                            <p class="text-xs text-slate-500 mt-1">可能非服務時間或尾班車已過</p>
                         </div>
                     `;
                     return;
@@ -1369,11 +1371,12 @@
                         diffMins = Math.max(0, Math.floor(diffMs / 60000));
                     }
 
-                    let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
+                    // 班次時間文字微調放大 (+4px 效果)
+                    let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
                     if (diffSec > 0 && diffSec <= 60) {
-                        timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將抵達</span>`;
+                        timeBadge = `<span class="px-2.5 py-1 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-sm">即將抵達</span>`;
                     } else if (diffSec <= 0) {
-                        timeBadge = `<span class="px-2 py-0.5 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-xs">即將到達</span>`;
+                        timeBadge = `<span class="px-2.5 py-1 rounded-lg bg-rose-600/30 border border-rose-500 text-rose-400 font-bold text-sm">即將到達</span>`;
                     }
 
                     let remark = item.rmk_tc || item.remark_tc || '實時班次';
@@ -1382,19 +1385,19 @@
                     const destName = currentActiveStop.dest || item.dest_tc || '終點站';
 
                     return `
-                        <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
+                        <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
                             <div class="flex items-center gap-2.5 overflow-hidden">
-                                <div class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xs font-black text-slate-300 shrink-0">
+                                <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-black text-slate-300 shrink-0">
                                     ${idx + 1}
                                 </div>
                                 <div class="overflow-hidden">
-                                    <h4 class="font-bold text-sm text-slate-100 truncate">往 ${destName}</h4>
-                                    <p class="text-[10px] text-slate-400 truncate mt-0.5">${remark}</p>
+                                    <h4 class="font-bold text-lg text-slate-100 truncate">往 ${destName}</h4>
+                                    <p class="text-xs text-slate-400 truncate mt-0.5">${remark}</p>
                                 </div>
                             </div>
                             <div class="text-right shrink-0">
                                 ${timeBadge}
-                                <div class="text-[10px] text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
+                                <div class="text-xs text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
                             </div>
                         </div>
                     `;
@@ -1536,6 +1539,11 @@
 
             renderActiveStopDashboard();
             fetchRealTimeETA();
+            
+            // 啟動 30 秒自動更新預報
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
+
             fetchStopsForSelectedRoute(true);
         }
 
@@ -1598,6 +1606,9 @@
             closeChangeStopModal();
             renderActiveStopDashboard();
             fetchRealTimeETA();
+
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 30000);
         }
 
         function filterChangeStops() {
@@ -1967,10 +1978,10 @@
 
                 if (res.ok) {
                     const data = await res.json();
-                    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法取得答覆。';
+                    const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法回應。';
                     chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
-                            ${parseMarkdown(reply)}
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed shadow">
+                            ${parseMarkdown(aiReply)}
                         </div>
                     `;
                 } else {
@@ -1983,10 +1994,9 @@
             } catch (err) {
                 const loadingEl = document.getElementById(loadingId);
                 if (loadingEl) loadingEl.remove();
-
                 chatBox.innerHTML += `
                     <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        連線失敗，請檢查網路連線。
+                        網絡連線錯誤，請稍後重試。
                     </div>
                 `;
             }
