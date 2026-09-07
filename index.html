@@ -775,9 +775,9 @@
                             // 判定是否為 羅湖/落馬洲 開往 金鐘 方向 (東鐵綫 DOWN 方向往 ADM)
                             const isLoWuToAdmiralty = (lineCode === 'EAL' && (selectedMtrStation === 'LOW' || selectedMtrStation === 'LMC' || trains.some(t => t.dest === 'ADM')));
                             // 判定是否為 康城 開往 北角 或 調景嶺 方向 (將軍澳綫 LHP 往 NOP/TIK)
-                            const isLOHAS ToNorthPointOrTiuKengLeng = (lineCode === 'TKL' && selectedMtrStation === 'LHP' && trains.some(t => t.dest === 'NOP' || t.dest === 'TIK'));
+                            const isLOHASToNorthPointOrTiuKengLeng = (lineCode === 'TKL' && selectedMtrStation === 'LHP' && trains.some(t => t.dest === 'NOP' || t.dest === 'TIK'));
 
-                            if (isLoWuToAdmiralty || isLOHAS ToNorthPointOrTiuKengLeng) {
+                            if (isLoWuToAdmiralty || isLOHASToNorthPointOrTiuKengLeng) {
                                 takeCount = 4;
                             }
                         }
