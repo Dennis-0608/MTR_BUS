@@ -67,33 +67,33 @@
                 
                 <!-- Bus / MTR Toggle -->
                 <div class="bg-slate-950 p-1 rounded-xl flex items-center shrink-0 border border-slate-800">
-                    <button id="btn-bus" onclick="switchMode('bus')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-blue-600 text-white shadow-sm">
+                    <button id="btn-bus" onclick="switchMode('bus')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white">
                         <i class="fa-solid fa-bus"></i>
                         <span>巴士</span>
                     </button>
-                    <button id="btn-mtr" onclick="switchMode('mtr')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white">
+                    <button id="btn-mtr" onclick="switchMode('mtr')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-purple-700 text-white shadow-sm">
                         <i class="fa-solid fa-train-subway"></i>
                         <span>MTR</span>
                     </button>
                 </div>
 
-                <!-- Live Weather & District Badge -->
-                <div id="weather-box" onclick="fetchWeatherAndLocation()" class="flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl text-xs gap-1.5 shrink-0 cursor-pointer hover:border-slate-700 transition">
-                    <span id="weatherIcon" class="text-base">⛅</span>
-                    <span id="weatherTemp" class="font-extrabold text-emerald-400 text-xs sm:text-sm">--°C</span>
-                    <span id="weatherLocation" class="text-slate-300 text-xs">香港</span>
-                    <i class="fa-solid fa-location-dot text-[10px] text-indigo-400" id="gpsStatusIcon"></i>
+                <!-- Live Weather & District Badge (字體大小已增加 4px: 由 text-xs 提升至 text-base) -->
+                <div id="weather-box" onclick="fetchWeatherAndLocation()" class="flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl text-base gap-1.5 shrink-0 cursor-pointer hover:border-slate-700 transition">
+                    <span id="weatherIcon" class="text-xl">⛅</span>
+                    <span id="weatherTemp" class="font-extrabold text-emerald-400 text-base sm:text-lg">--°C</span>
+                    <span id="weatherLocation" class="text-slate-300 text-base">香港</span>
+                    <i class="fa-solid fa-location-dot text-xs text-indigo-400" id="gpsStatusIcon"></i>
                 </div>
 
                 <!-- Gemini AI Button (Visible in Bus mode) -->
-                <button id="aiTriggerBtn" onclick="openAiModal()" class="w-8 h-8 rounded-xl bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center justify-center active:scale-95 transition shrink-0" title="Gemini AI 助手">
+                <button id="aiTriggerBtn" onclick="openAiModal()" class="w-8 h-8 rounded-xl bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center justify-center active:scale-95 transition shrink-0 hidden" title="Gemini AI 助手">
                     <i class="fa-solid fa-robot text-xs"></i>
                 </button>
 
             </div>
 
             <!-- Row 2: Search Buttons & Last Update Time -->
-            <div id="busNavActions" class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+            <div id="busNavActions" class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80 hidden">
                 <div class="flex items-center gap-1.5 flex-1">
                     <button onclick="openSearchModal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
                         <i class="fa-solid fa-magnifying-glass"></i>
@@ -114,7 +114,7 @@
             </div>
 
             <!-- MTR Refresh Bar -->
-            <div id="mtrNavActions" class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800/80 hidden">
+            <div id="mtrNavActions" class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800/80">
                 <div class="flex items-center gap-1.5 flex-1 overflow-hidden">
                     <select id="mtrLineSelect" onchange="onMtrLineChange()" class="w-1/2 max-w-[110px] bg-slate-950 border border-slate-800 text-purple-300 rounded-lg px-1.5 py-1 focus:outline-none focus:border-purple-500 text-[11px] font-bold truncate">
                     </select>
@@ -135,7 +135,7 @@
         <main class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
 
             <!-- BUS VIEW CONTAINER -->
-            <div id="busViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+            <div id="busViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden hidden">
                 <div id="activeStopCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col gap-1.5 shrink-0">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 overflow-hidden">
@@ -177,7 +177,7 @@
             </div>
 
             <!-- MTR VIEW CONTAINER -->
-            <div id="mtrViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden hidden">
+            <div id="mtrViewContainer" class="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-hidden min-h-0">
                     
                     <div class="flex flex-col gap-2 border-b border-slate-800/80 pb-2.5 mb-2.5 shrink-0">
@@ -220,7 +220,7 @@
             <div class="flex items-center justify-between mb-1.5 px-0.5">
                 <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                     <i class="fa-solid fa-star text-amber-400 text-xs"></i>
-                    <span id="favFooterTitle">我的巴士收藏車站</span>
+                    <span id="favFooterTitle">我的 MTR 收藏車站</span>
                 </h3>
             </div>
             
@@ -231,7 +231,7 @@
                 
                 <div id="favoritesSection" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth w-full px-7">
                     <div class="text-slate-500 text-xs py-1 px-1">
-                        未有收藏，查詢車站時點擊「收藏」即可儲存
+                        未有 MTR 收藏，選擇鐵路站時點擊「收藏」即可儲存
                     </div>
                 </div>
 
@@ -456,7 +456,6 @@
             }
         }
 
-        // 判斷該車站是否屬於路線總站 (Terminal)
         function checkIsTerminalStation(stationCode, lineCode) {
             if (!mtrData[lineCode] || !mtrData[lineCode].stations) return false;
             const stations = mtrData[lineCode].stations;
@@ -464,13 +463,12 @@
             return stations[0].code === stationCode || stations[stations.length - 1].code === stationCode;
         }
 
-        // 判斷該車站是否為轉乘站 (Interchange Station)
         function checkIsInterchangeStation(stationCode) {
             const lines = stationToLinesMap.get(stationCode) || [];
             return lines.length > 1;
         }
 
-        let currentMode = 'bus'; 
+        let currentMode = 'mtr'; 
         let kmbRoutes = [];
         let ctbRoutes = [];
         let routeMap = new Map(); 
@@ -513,7 +511,6 @@
         window.onload = async function() {
             initStationToLinesMap();
             fetchWeatherAndLocation();
-            renderFavorites();
             initMtrDropdowns();
             await loadInitialBusData();
 
@@ -529,13 +526,12 @@
                 }
             });
 
-            if (favorites.length > 0) {
-                loadFavoriteItem(favorites[0]);
-            }
+            // 預設切換至 MTR 模式
+            switchMode('mtr');
+            renderFavorites();
         };
 
         function switchMode(mode) {
-            if (currentMode === mode) return;
             currentMode = mode;
 
             const btnBus = document.getElementById('btn-bus');
@@ -619,8 +615,9 @@
             updateMtrFavButtonState();
             fetchMtrETA();
 
+            // 定時更新為每 30 秒 (30000 毫秒) 次
             if (mtrAutoRefreshTimer) clearInterval(mtrAutoRefreshTimer);
-            mtrAutoRefreshTimer = setInterval(fetchMtrETA, 10000);
+            mtrAutoRefreshTimer = setInterval(fetchMtrETA, 30000);
         }
 
         function renderMtrFilterButtons() {
@@ -684,7 +681,6 @@
             fetchMtrETA();
         }
 
-        // 修改後的核心 MTR 到站預報邏輯
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
 
@@ -747,9 +743,8 @@
                         });
                         valid.sort((a, b) => a.arrivalTime - b.arrivalTime);
 
-                        let takeCount = 2; // 預設顯示 2 個班次
+                        let takeCount = 2;
 
-                        // 精確定位：針對金鐘站往羅湖/落馬洲、羅湖往金鐘、落馬洲往金鐘的特定方向設定顯示 4 個班次
                         const isAdmUpToLowLmc = (lineCode === 'EAL' && selectedMtrStation === 'ADM' && dir === 'UP');
                         const isLowDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LOW' && dir === 'DOWN');
                         const isLmcDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LMC' && dir === 'DOWN');
@@ -757,7 +752,7 @@
                         if (isAdmUpToLowLmc || isLowDownToAdm || isLmcDownToAdm) {
                             takeCount = 4;
                         } else if (lineCode === 'EAL') {
-                            takeCount = 2; // 東鐵綫其他車站方向維持顯示 2 個班次
+                            takeCount = 2;
                         } else if (!isInterchange && !isTermInThisLine) {
                             takeCount = 2;
                         } else {
@@ -777,7 +772,6 @@
                             }
                         }
 
-                        // 特定方向多班次特別過濾邏輯 (康城往北角/調景嶺顯示 4 個班次)
                         if (trains.length > 0) {
                             const isLOHASToNorthPointOrTiuKengLeng = (lineCode === 'TKL' && selectedMtrStation === 'LHP' && trains.some(t => t.dest === 'NOP' || t.dest === 'TIK'));
                             if (isLOHASToNorthPointOrTiuKengLeng) {
@@ -911,7 +905,7 @@
             const tempEl = document.getElementById('weatherTemp');
             const iconEl = document.getElementById('weatherIcon');
 
-            if (gpsIcon) gpsIcon.className = "fa-solid fa-spinner fa-spin text-[10px] text-amber-400";
+            if (gpsIcon) gpsIcon.className = "fa-solid fa-spinner fa-spin text-xs text-amber-400";
 
             let userDistrict = null;
 
@@ -937,12 +931,12 @@
                         }
                     });
 
-                    if (gpsIcon) gpsIcon.className = "fa-solid fa-location-dot text-[10px] text-emerald-400";
+                    if (gpsIcon) gpsIcon.className = "fa-solid fa-location-dot text-xs text-emerald-400";
                 } catch (err) {
-                    if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-[10px] text-slate-500";
+                    if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-xs text-slate-500";
                 }
             } else {
-                if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-[10px] text-slate-500";
+                if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-xs text-slate-500";
             }
 
             try {
@@ -1954,50 +1948,47 @@
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                const stopContext = currentActiveStop ? `用戶目前正在查看 ${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route}號線，車站為「${currentActiveStop.stopName}」，目的地為 ${currentActiveStop.dest}。` : '用戶目前未選擇特定車站。';
+                const stopContext = currentActiveStop ? `用戶目前正在查看 ${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route}號線，車站為「${currentActiveStop.stopName}」，目的地為 ${currentActiveStop.dest}。` : '用戶未選擇特定巴士站。';
                 
-                const systemInstruction = `你是一名資深的香港公共交通專家，廣廣東話為主要回答語言。`;
+                const systemInstruction = `你是一名資深的香港公共交通專家，主要以廣東話回答問題。${stopContext}`;
 
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [
-                            { role: 'user', parts: [{ text: `${systemInstruction}\n\n[當前環境數據]: ${stopContext}\n\n[用戶問題]: ${text}` }] }
+                            { role: 'user', parts: [{ text: `${systemInstruction}\n\n用戶問題: ${text}` }] }
                         ]
                     })
                 });
 
-                const data = await res.json();
-                const loadElem = document.getElementById(loadingId);
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
 
-                if (data.candidates && data.candidates[0]?.content?.parts[0]) {
-                    const aiReply = data.candidates[0].content.parts[0].text;
-                    if (loadElem) {
-                        loadElem.outerHTML = `
-                            <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow-sm">
-                                ${parseMarkdown(aiReply)}
-                            </div>
-                        `;
-                    }
+                if (res.ok) {
+                    const data = await res.json();
+                    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法取得答覆。';
+                    chatBox.innerHTML += `
+                        <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
+                            ${parseMarkdown(reply)}
+                        </div>
+                    `;
                 } else {
-                    if (loadElem) {
-                        loadElem.outerHTML = `
-                            <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                                AI 回覆失敗，請檢查 API Key 是否正確。
-                            </div>
-                        `;
-                    }
-                }
-            } catch (err) {
-                const loadElem = document.getElementById(loadingId);
-                if (loadElem) {
-                    loadElem.outerHTML = `
+                    chatBox.innerHTML += `
                         <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            網路連線失敗，請稍後重試。
+                            API 請求失敗，請檢查 API Key 是否正確。
                         </div>
                     `;
                 }
+            } catch (err) {
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+
+                chatBox.innerHTML += `
+                    <div class="bg-rose-950/60 border border-rose-900 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                        連線失敗，請檢查網路連線。
+                    </div>
+                `;
             }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
