@@ -528,7 +528,6 @@
             if (!routeNum) return false;
             const r = String(routeNum).trim().toUpperCase();
             
-            // 過海隧巴及特快/通宵隧巴特徵（1xx, 3xx, 6xx, 9xx, N1xx, N3xx, N6xx, N9xx, X9xx, H1, H2等）
             const jointPattern = /^(1|3|6|9|N1|N3|N6|N9|X9|H1|H2)\d{2}[A-Z]?$/;
             
             const existsInKmb = kmbRoutes.some(item => String(item.route).toUpperCase() === r);
@@ -1310,27 +1309,77 @@
 
         async function fetchCoCompanyData(route, bound, seq, currentComp) {
             const coComp = (currentComp === 'kmb') ? 'ctb' : 'kmb';
-            const dirStr = (bound === 'inbound' || bound === 'I') ? 'inbound' : 'outbound';
 
             try {
-                let coStops = [];
+                let outStops = [], inStops = [];
+
                 if (coComp === 'kmb') {
-                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/${dirStr}/1`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        coStops = data.data || [];
-                    }
+                    const [resOut, resIn] = await Promise.all([
+                        fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/outbound/1`),
+                        fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/inbound/1`)
+                    ]);
+                    if (resOut.ok) { const d = await resOut.json(); outStops = d.data || []; }
+                    if (resIn.ok) { const d = await resIn.json(); inStops = d.data || []; }
                 } else {
-                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dirStr}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        coStops = data.data || [];
+                    const [resOut, resIn] = await Promise.all([
+                        fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/outbound`),
+                        fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/inbound`)
+                    ]);
+                    if (resOut.ok) { const d = await resOut.json(); outStops = d.data || []; }
+                    if (resIn.ok) { const d = await resIn.json(); inStops = d.data || []; }
+                }
+
+                if (outStops.length === 0 && inStops.length === 0) return null;
+
+                const currentTotal = currentActiveStop ? (currentActiveStop.totalStops || currentRouteStops.length || 0) : 0;
+                let targetCoStops = [];
+                let targetCoDir = 'outbound';
+
+                // 自動方向對齊技術：比對總站數與第 1 站站名
+                if (currentTotal > 0 && outStops.length === currentTotal && inStops.length !== currentTotal) {
+                    targetCoStops = outStops;
+                    targetCoDir = 'outbound';
+                } else if (currentTotal > 0 && inStops.length === currentTotal && outStops.length !== currentTotal) {
+                    targetCoStops = inStops;
+                    targetCoDir = 'inbound';
+                } else {
+                    const currentFirstStopName = (currentRouteStops && currentRouteStops.length > 0) ? currentRouteStops[0].name : '';
+                    let outFirstStopName = '';
+                    let inFirstStopName = '';
+
+                    if (outStops.length > 0) {
+                        const id = outStops[0].stop;
+                        outFirstStopName = (coComp === 'kmb') ? (kmbStopsDirectory.get(id) || '') : (ctbStopsDirectory.get(id) || '');
+                    }
+                    if (inStops.length > 0) {
+                        const id = inStops[0].stop;
+                        inFirstStopName = (coComp === 'kmb') ? (kmbStopsDirectory.get(id) || '') : (ctbStopsDirectory.get(id) || '');
+                    }
+
+                    if (currentFirstStopName && outFirstStopName && (currentFirstStopName.includes(outFirstStopName) || outFirstStopName.includes(currentFirstStopName))) {
+                        targetCoStops = outStops;
+                        targetCoDir = 'outbound';
+                    } else if (currentFirstStopName && inFirstStopName && (currentFirstStopName.includes(inFirstStopName) || inFirstStopName.includes(currentFirstStopName))) {
+                        targetCoStops = inStops;
+                        targetCoDir = 'inbound';
+                    } else {
+                        const diffOut = Math.abs(outStops.length - currentTotal);
+                        const diffIn = Math.abs(inStops.length - currentTotal);
+                        if (diffOut < diffIn) {
+                            targetCoStops = outStops;
+                            targetCoDir = 'outbound';
+                        } else if (diffIn < diffOut) {
+                            targetCoStops = inStops;
+                            targetCoDir = 'inbound';
+                        } else {
+                            const isCurrentInbound = (bound === 'inbound' || bound === 'I');
+                            targetCoStops = isCurrentInbound ? (inStops.length > 0 ? inStops : outStops) : (outStops.length > 0 ? outStops : inStops);
+                            targetCoDir = isCurrentInbound ? 'inbound' : 'outbound';
+                        }
                     }
                 }
 
-                if (coStops.length === 0) return null;
-
-                const matchedStopObj = coStops.find(s => Number(s.seq) === Number(seq)) || coStops[Math.min(seq - 1, coStops.length - 1)];
+                const matchedStopObj = targetCoStops.find(s => Number(s.seq) === Number(seq)) || targetCoStops[Math.min(seq - 1, targetCoStops.length - 1)];
                 if (!matchedStopObj) return null;
 
                 const coStopId = matchedStopObj.stop;
@@ -1357,14 +1406,14 @@
                 }
 
                 let coEtas = [];
-                const targetDir = (bound === 'inbound' || bound === 'I') ? 'I' : 'O';
+                const coApiDir = (targetCoDir === 'inbound' || targetCoDir === 'I') ? 'I' : 'O';
 
                 if (coComp === 'kmb') {
                     const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${coStopId}`);
                     if (res.ok) {
                         const data = await res.json();
                         const list = data.data || [];
-                        coEtas = list.filter(item => String(item.route) === String(route) && String(item.dir) === targetDir);
+                        coEtas = list.filter(item => String(item.route) === String(route) && String(item.dir) === coApiDir);
                     }
                 } else {
                     const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${coStopId}/${route}`);
@@ -1965,187 +2014,36 @@
                             const key = `${item.company}_${item.route}_${item.bound}_${item.dest}`;
                             if (!deduplicatedMap.has(key)) {
                                 deduplicatedMap.set(key, item);
-                            } else {
-                                const existing = deduplicatedMap.get(key);
-                                if (item.distance < existing.distance) {
-                                    deduplicatedMap.set(key, item);
-                                }
                             }
                         });
 
-                        const sortedResults = Array.from(deduplicatedMap.values())
-                            .sort((a, b) => a.distance - b.distance)
-                            .slice(0, 100);
+                        const sortedList = Array.from(deduplicatedMap.values()).sort((a, b) => a.distance - b.distance);
 
-                        container.innerHTML = sortedResults.map(item => {
-                            const compBadge = item.company === 'kmb' 
-                                ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>' 
-                                : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
-
-                            const distText = item.distance < 1000 ? `${item.distance} 米` : `${(item.distance / 1000).toFixed(1)} 公里`;
-
-                            return `
-                                <div onclick="selectGpsRouteItem('${item.company}', '${item.route}', '${item.bound}', '${item.serviceType}', '${item.stopId}', '${item.stopName.replace(/'/g, "\\'")}', ${item.seq}, '${item.dest.replace(/'/g, "\\'")}', '${item.orig.replace(/'/g, "\\'")}')" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm active:scale-98">
-                                    <div class="flex items-center gap-2 overflow-hidden flex-1">
-                                        ${compBadge}
-                                        <div class="overflow-hidden">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="font-black text-emerald-400 text-sm">${item.route}</span>
-                                                <span class="text-xs font-bold text-slate-200 truncate">往 ${item.dest}</span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 truncate mt-0.5">
-                                                <i class="fa-solid fa-location-dot text-[9px] text-indigo-400 mr-1"></i>${item.stopName}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right shrink-0">
-                                        <span class="bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-lg inline-block">
-                                            ${distText}
-                                        </span>
+                        container.innerHTML = sortedList.slice(0, 30).map(item => `
+                            <div onclick="selectStopAndClose('${item.stopId}', '${item.stopName.replace(/'/g, "\\'")}', ${item.seq})" class="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between gap-2 text-xs transition">
+                                <div class="flex items-center gap-2 overflow-hidden">
+                                    <span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">${item.route}</span>
+                                    <div class="overflow-hidden">
+                                        <div class="font-bold text-slate-100 truncate">${item.stopName} (第 ${item.seq} 站)</div>
+                                        <div class="text-[10px] text-slate-400 truncate">往 ${item.dest}</div>
                                     </div>
                                 </div>
-                            `;
-                        }).join('');
+                                <span class="text-[10px] font-bold text-emerald-400 shrink-0">${item.distance}m</span>
+                            </div>
+                        `).join('');
 
                     } catch (err) {
-                        console.error("GPS search error:", err);
-                        container.innerHTML = `
-                            <div class="text-center py-10 text-rose-400 text-xs">
-                                <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                                <p>搜尋附近車站時發生錯誤，請重試</p>
-                            </div>
-                        `;
+                        console.error("GPS error:", err);
+                        container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">GPS 定位檢索失敗</div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
-                (error) => {
+                (err) => {
+                    container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">無法讀取 GPS 位置</div>`;
                     isGpsSearching = false;
-                    container.innerHTML = `
-                        <div class="text-center py-10 text-rose-400 text-xs">
-                            <i class="fa-solid fa-location-slash text-2xl mb-2 block text-slate-500"></i>
-                            <p class="font-bold">無法存取您的 GPS 位置</p>
-                            <p class="text-slate-400 mt-1">請在瀏覽器設定中開啟位置權限後重試</p>
-                        </div>
-                    `;
-                },
-                { timeout: 10000, enableHighAccuracy: true, maximumAge: 10000 }
+                }
             );
-        }
-
-        async function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest, orig) {
-            currentCompany = company;
-            selectedRoute = route;
-            selectedBound = {
-                bound: bound,
-                serviceType: serviceType || '1',
-                orig: orig || '',
-                dest: dest || ''
-            };
-
-            currentActiveStop = {
-                company: company,
-                route: route,
-                bound: bound,
-                orig: orig || '',
-                dest: dest || '',
-                serviceType: serviceType || '1',
-                stopId: stopId,
-                stopName: stopName,
-                seq: seq,
-                totalStops: 0
-            };
-
-            closeGpsSearchModal();
-            renderActiveStopDashboard();
-            fetchRealTimeETA();
-
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 10000);
-
-            fetchStopsForSelectedRoute(true);
-        }
-
-        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
-        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
-        function toggleApiKeyInput() {
-            const p = document.getElementById('apiKeyPanel');
-            p.classList.toggle('hidden');
-        }
-        function saveApiKey() {
-            const val = document.getElementById('geminiApiKeyInput').value.trim();
-            userApiKey = val;
-            localStorage.setItem('gemini_custom_apikey', val);
-            toggleApiKeyInput();
-        }
-
-        async function sendAiMessage() {
-            const input = document.getElementById('aiInput');
-            const chatBox = document.getElementById('aiChatBox');
-            const text = input.value.trim();
-            if (!text) return;
-
-            input.value = '';
-            chatBox.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        ${text}
-                    </div>
-                </div>
-            `;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            aiChatHistory.push({ role: "user", parts: [{ text: text }] });
-
-            const loadingId = 'ai-loading-' + Date.now();
-            chatBox.innerHTML += `
-                <div id="${loadingId}" class="flex items-center gap-2 text-xs text-slate-400 py-1">
-                    <i class="fa-solid fa-spinner fa-spin text-indigo-400"></i>
-                    <span>Gemini 正在思考中...</span>
-                </div>
-            `;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            const apiKeyToUse = userApiKey || "YOUR_GEMINI_API_KEY_FALLBACK";
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [{ text: "你是香港巴士交通AI助手。請以繁體中文回答有關香港公共交通的問題。" }]
-                            },
-                            ...aiChatHistory
-                        ]
-                    })
-                });
-
-                const data = await response.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法回答該問題。";
-
-                document.getElementById(loadingId)?.remove();
-
-                chatBox.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
-                            ${reply.replace(/\n/g, '<br>')}
-                        </div>
-                    </div>
-                `;
-                aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
-            } catch (e) {
-                document.getElementById(loadingId)?.remove();
-                chatBox.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-rose-900/60 border border-rose-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
-                            暫時無法連接 Gemini AI。請檢查網路或確認是否已設定正確的 API Key。
-                        </div>
-                    </div>
-                `;
-            }
         }
     </script>
 </body>
