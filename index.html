@@ -527,18 +527,14 @@
         function isJointRoute(routeNum) {
             if (!routeNum) return false;
             const r = String(routeNum).trim().toUpperCase();
-            
             const jointPattern = /^(1|3|6|9|N1|N3|N6|N9|X9|H1|H2)\d{2}[A-Z]?$/;
-            
             const existsInKmb = kmbRoutes.some(item => String(item.route).toUpperCase() === r);
             const existsInCtb = ctbRoutes.some(item => String(item.route).toUpperCase() === r);
-
             return jointPattern.test(r) && existsInKmb && existsInCtb;
         }
 
         function switchMode(mode) {
             currentMode = mode;
-
             const btnBus = document.getElementById('btn-bus');
             const btnMtr = document.getElementById('btn-mtr');
             const busNavActions = document.getElementById('busNavActions');
@@ -550,7 +546,6 @@
             if (mode === 'bus') {
                 btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-blue-600 text-white shadow-sm";
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
-                
                 busNavActions.classList.remove('hidden');
                 mtrNavActions.classList.add('hidden');
                 aiTriggerBtn.classList.remove('hidden');
@@ -565,7 +560,6 @@
             } else {
                 btnMtr.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-purple-700 text-white shadow-sm";
                 btnBus.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white";
-                
                 busNavActions.classList.add('hidden');
                 mtrNavActions.classList.remove('hidden');
                 aiTriggerBtn.classList.add('hidden');
@@ -582,12 +576,10 @@
         function initMtrDropdowns() {
             const lineSelect = document.getElementById('mtrLineSelect');
             let optionsHtml = '<option value="">路線</option>';
-            
             for (let code in mtrData) {
                 optionsHtml += `<option value="${code}">${mtrData[code].name}</option>`;
             }
             lineSelect.innerHTML = optionsHtml;
-
             const stationSelect = document.getElementById('mtrStationSelect');
             stationSelect.innerHTML = '<option value="">車站</option>';
         }
@@ -613,7 +605,6 @@
         function onMtrStationChange() {
             const stationSelect = document.getElementById('mtrStationSelect');
             selectedMtrStation = stationSelect.value;
-
             if (!selectedMtrStation) return;
 
             const stationName = mtrStationNames[selectedMtrStation] || selectedMtrStation;
@@ -622,7 +613,6 @@
 
             selectedMtrFilterLine = 'ALL';
             renderMtrFilterButtons();
-
             updateMtrFavButtonState();
             fetchMtrETA();
 
@@ -632,25 +622,18 @@
 
         function renderMtrFilterButtons() {
             const filterContainer = document.getElementById('mtrFilterContainer');
-            if (!selectedMtrStation) {
-                filterContainer.classList.add('hidden');
-                return;
-            }
-
-            if (selectedMtrStation === 'EXC') {
+            if (!selectedMtrStation || selectedMtrStation === 'EXC') {
                 filterContainer.classList.add('hidden');
                 return;
             }
 
             const passedLines = stationToLinesMap.get(selectedMtrStation) || [];
-            
             if (passedLines.length <= 1) {
                 filterContainer.classList.add('hidden');
                 return;
             }
 
             filterContainer.classList.remove('hidden');
-
             const isAllActive = (selectedMtrFilterLine === 'ALL');
             let buttonsHtml = `
                 <button onclick="setMtrLineFilter('ALL')" class="px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 border ${
@@ -693,7 +676,6 @@
 
         async function fetchMtrETA() {
             if (!selectedMtrStation) return;
-
             const container = document.getElementById('mtrEtaListContainer');
             const icon = document.getElementById('mtrRefreshIcon');
             const timeEl = document.getElementById('mtrRefreshTime');
@@ -701,12 +683,7 @@
             if (icon) icon.classList.add('fa-spin');
             timeEl.textContent = new Date().toLocaleTimeString('zh-HK', { hour12: false });
 
-            let activeLines = [];
-            if (selectedMtrFilterLine !== 'ALL') {
-                activeLines = [selectedMtrFilterLine];
-            } else {
-                activeLines = stationToLinesMap.get(selectedMtrStation) || (selectedMtrLine ? [selectedMtrLine] : []);
-            }
+            let activeLines = (selectedMtrFilterLine !== 'ALL') ? [selectedMtrFilterLine] : (stationToLinesMap.get(selectedMtrStation) || (selectedMtrLine ? [selectedMtrLine] : []));
 
             if (activeLines.length === 0) {
                 container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">請選擇車站</div>`;
@@ -725,18 +702,15 @@
                 const results = await Promise.all(fetchPromises);
                 let finalTrainList = [];
                 const now = new Date();
-
                 const isInterchange = checkIsInterchangeStation(selectedMtrStation);
 
                 results.forEach(({ lineCode, data }) => {
                     if (!data || data.status === 0 || !data.data) return;
-
                     const key = `${lineCode}-${selectedMtrStation}`;
                     const scheduleData = data.data[key];
                     if (!scheduleData) return;
 
                     const isTermInThisLine = checkIsTerminalStation(selectedMtrStation, lineCode);
-
                     const upTrains = (scheduleData.UP || []).map(t => ({ ...t, lineCode, dir: 'UP' }));
                     const downTrains = (scheduleData.DOWN || []).map(t => ({ ...t, lineCode, dir: 'DOWN' }));
 
@@ -746,15 +720,12 @@
                             if (t.time) {
                                 const arrivalTime = new Date(t.time.replace(/-/g, '/'));
                                 const diffSec = Math.floor((arrivalTime - now) / 1000);
-                                if (diffSec >= -30) {
-                                    valid.push({ ...t, diffSec, arrivalTime });
-                                }
+                                if (diffSec >= -30) valid.push({ ...t, diffSec, arrivalTime });
                             }
                         });
                         valid.sort((a, b) => a.arrivalTime - b.arrivalTime);
 
                         let takeCount = 2;
-
                         if (selectedMtrStation === 'LHP') {
                             takeCount = 4;
                         } else {
@@ -770,29 +741,16 @@
                                 takeCount = 2;
                             } else {
                                 const isExcludedTerminal = ["NOP", "ADM", "TIK"].includes(selectedMtrStation);
-                                if (isTermInThisLine && !isExcludedTerminal) {
-                                    takeCount = 4;
-                                }
-
-                                if (selectedMtrStation === 'NOP' && trains.some(t => t.dest === 'POA' || t.dest === 'LHP')) {
-                                    takeCount = 4;
-                                }
-                                else if (selectedMtrStation === 'TIK' && trains.some(t => t.dest === 'WHA')) {
-                                    takeCount = 4;
-                                }
-                                else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'SOH')) {
-                                    takeCount = 4;
-                                }
+                                if (isTermInThisLine && !isExcludedTerminal) takeCount = 4;
+                                if (selectedMtrStation === 'NOP' && trains.some(t => t.dest === 'POA' || t.dest === 'LHP')) takeCount = 4;
+                                else if (selectedMtrStation === 'TIK' && trains.some(t => t.dest === 'WHA')) takeCount = 4;
+                                else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'SOH')) takeCount = 4;
                             }
                         }
-
                         return valid.slice(0, takeCount);
                     };
 
-                    const validUp = processDirection(upTrains, 'UP');
-                    const validDown = processDirection(downTrains, 'DOWN');
-
-                    finalTrainList.push(...validUp, ...validDown);
+                    finalTrainList.push(...processDirection(upTrains, 'UP'), ...processDirection(downTrains, 'DOWN'));
                 });
 
                 finalTrainList.sort((a, b) => a.arrivalTime - b.arrivalTime);
@@ -812,18 +770,15 @@
                     const plat = t.plat || '1';
                     const lineName = mtrData[t.lineCode] ? mtrData[t.lineCode].name : t.lineCode;
                     const lineColor = mtrLineColors[t.lineCode] || '#6b7280';
-
                     const diffSec = t.diffSec;
                     let minutesLeft = Math.max(0, Math.floor(diffSec / 60));
-
                     let statusText = `${minutesLeft} 分鐘`;
                     let isSpecialState = false;
 
                     if (diffSec > 0 && diffSec <= 60) {
                         statusText = "即將抵達";
                         isSpecialState = true;
-                    } 
-                    else if (diffSec <= 0 && diffSec >= -30) {
+                    } else if (diffSec <= 0 && diffSec >= -30) {
                         statusText = "正在離開";
                         isSpecialState = true;
                     }
@@ -852,12 +807,7 @@
 
             } catch (err) {
                 console.error("MTR Fetch error:", err);
-                container.innerHTML = `
-                    <div class="text-center py-8 text-rose-400 text-xs">
-                        <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                        <p>更新列車資訊失敗，請刷新重試</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs"><i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i><p>更新列車資訊失敗，請刷新重試</p></div>`;
             } finally {
                 if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
             }
@@ -884,7 +834,6 @@
         function deleteMtrFavorite() {
             if (!selectedMtrStation) return;
             const index = mtrFavorites.findIndex(f => f.station === selectedMtrStation);
-
             if (index >= 0) {
                 mtrFavorites.splice(index, 1);
                 localStorage.setItem('hk_mtr_favs', JSON.stringify(mtrFavorites));
@@ -917,22 +866,15 @@
             const iconEl = document.getElementById('weatherIcon');
 
             if (gpsIcon) gpsIcon.className = "fa-solid fa-spinner fa-spin text-xs text-amber-400";
-
             let userDistrict = null;
 
             if ("geolocation" in navigator) {
                 try {
                     const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            timeout: 6000,
-                            maximumAge: 30000,
-                            enableHighAccuracy: true
-                        });
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 6000, maximumAge: 30000, enableHighAccuracy: true });
                     });
-
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-
                     let minDist = Infinity;
                     hkDistricts.forEach(d => {
                         const dist = Math.sqrt(Math.pow(d.lat - lat, 2) + Math.pow(d.lng - lng, 2));
@@ -941,23 +883,17 @@
                             userDistrict = d;
                         }
                     });
-
                     if (gpsIcon) gpsIcon.className = "fa-solid fa-location-dot text-xs text-emerald-400";
                 } catch (err) {
                     if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-xs text-slate-500";
                 }
-            } else {
-                if (gpsIcon) gpsIcon.className = "fa-solid fa-location-slash text-xs text-slate-500";
             }
 
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.icon && data.icon.length > 0) {
-                        iconEl.textContent = getHkoWeatherEmoji(data.icon[0]);
-                    }
-
+                    if (data.icon && data.icon.length > 0) iconEl.textContent = getHkoWeatherEmoji(data.icon[0]);
                     const tempArr = (data.temperature && data.temperature.data) ? data.temperature.data : [];
                     let matchedTemp = null;
 
@@ -974,7 +910,6 @@
                         matchedTemp = hkoItem ? hkoItem.value : 28;
                         if (!userDistrict) locEl.textContent = "香港";
                     }
-
                     tempEl.textContent = `${matchedTemp}°C`;
                 }
             } catch (err) {
@@ -1000,13 +935,11 @@
                     const kmbData = await kmbRes.json();
                     kmbRoutes = kmbData.data || [];
                 }
-
                 const ctbRes = await fetch('https://rt.data.gov.hk/v2/transport/citybus/route/ctb');
                 if (ctbRes.ok) {
                     const ctbData = await ctbRes.json();
                     ctbRoutes = ctbData.data || [];
                 }
-
                 buildRouteMap('kmb');
             } catch (err) {
                 console.error("Failed loading routes:", err);
@@ -1017,21 +950,16 @@
             routeMap.clear();
             currentCompany = company;
             const routesList = (company === 'kmb') ? kmbRoutes : ctbRoutes;
-
             routesList.forEach(r => {
                 const routeNum = r.route;
-                if (!routeMap.has(routeNum)) {
-                    routeMap.set(routeNum, []);
-                }
+                if (!routeMap.has(routeNum)) routeMap.set(routeNum, []);
                 routeMap.get(routeNum).push(r);
             });
         }
 
         function onCompanySelectChange() {
             const select = document.getElementById('modalCompanySelect');
-            const newCompany = select.value;
-            buildRouteMap(newCompany);
-            
+            buildRouteMap(select.value);
             document.getElementById('routeSearchInput').value = '';
             clearAllStopData();
         }
@@ -1083,16 +1011,12 @@
         function clearAllStopData() {
             selectedBound = null;
             currentRouteStops = [];
-            
             const boundSelect = document.getElementById('modalBoundSelect');
             if (boundSelect) boundSelect.innerHTML = '<option value="">-- 請先選擇路線 --</option>';
-
             const stopHeader = document.getElementById('modalStopHeaderCount');
             if (stopHeader) stopHeader.textContent = '該路線全線所有停靠站點：';
-
             const stopSelect = document.getElementById('modalStopSelect');
             if (stopSelect) stopSelect.innerHTML = '<option value="">-- 請先選擇路線與行車方向 --</option>';
-
             const stopList = document.getElementById('modalStopList');
             if (stopList) stopList.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">請先選擇路線與方向</p>';
         }
@@ -1113,13 +1037,9 @@
                 routeVariants.forEach((v) => {
                     const orig = v.orig_tc || v.orig_en || '起點';
                     const dest = v.dest_tc || v.dest_en || '終點';
-
-                    const labelOut = `往 ${dest} (由 ${orig} 開出)`;
-                    optionsHtml += `<option value="outbound" data-service="1" data-orig="${orig}" data-dest="${dest}">${labelOut}</option>`;
-
+                    optionsHtml += `<option value="outbound" data-service="1" data-orig="${orig}" data-dest="${dest}">往 ${dest} (由 ${orig} 開出)</option>`;
                     if (orig !== dest) {
-                        const labelIn = `往 ${orig} (由 ${dest} 開出)`;
-                        optionsHtml += `<option value="inbound" data-service="1" data-orig="${dest}" data-dest="${orig}">${labelIn}</option>`;
+                        optionsHtml += `<option value="inbound" data-service="1" data-orig="${dest}" data-dest="${orig}">往 ${orig} (由 ${dest} 開出)</option>`;
                     }
                 });
             } else {
@@ -1133,9 +1053,7 @@
                     const dest = v.dest_tc || v.dest_en || '終點';
                     const serviceType = v.service_type || '1';
                     const serviceNote = (serviceType !== '1') ? ' [特別班次]' : '';
-
-                    const label = `往 ${dest} (由 ${orig} 開出)${serviceNote}`;
-                    optionsHtml += `<option value="${boundVal}" data-service="${serviceType}" data-orig="${orig}" data-dest="${dest}">${label}</option>`;
+                    optionsHtml += `<option value="${boundVal}" data-service="${serviceType}" data-orig="${orig}" data-dest="${dest}">往 ${dest} (由 ${orig} 開出)${serviceNote}</option>`;
                 });
             }
 
@@ -1147,16 +1065,11 @@
             const selectedOpt = boundSelect.options[boundSelect.selectedIndex];
             if (!selectedOpt || !selectedOpt.value) return;
 
-            const boundVal = selectedOpt.value;
-            const serviceType = selectedOpt.getAttribute('data-service') || '1';
-            const orig = selectedOpt.getAttribute('data-orig') || '';
-            const dest = selectedOpt.getAttribute('data-dest') || '';
-
             selectedBound = {
-                bound: boundVal,
-                serviceType: serviceType,
-                orig: orig,
-                dest: dest
+                bound: selectedOpt.value,
+                serviceType: selectedOpt.getAttribute('data-service') || '1',
+                orig: selectedOpt.getAttribute('data-orig') || '',
+                dest: selectedOpt.getAttribute('data-dest') || ''
             };
 
             await fetchStopsForSelectedRoute();
@@ -1232,9 +1145,7 @@
 
                 if (!quiet) {
                     document.getElementById('modalStopHeaderCount').textContent = `該路線全線所有停靠站點 (共 ${currentRouteStops.length} 個)：`;
-                    stopSelect.innerHTML = '<option value="">-- 請直接選擇車站 --</option>' + currentRouteStops.map(s => `
-                        <option value="${s.stopId}">${s.seq}. ${s.name}</option>
-                    `).join('');
+                    stopSelect.innerHTML = '<option value="">-- 請直接選擇車站 --</option>' + currentRouteStops.map(s => `<option value="${s.stopId}">${s.seq}. ${s.name}</option>`).join('');
 
                     stopListContainer.innerHTML = currentRouteStops.map(s => `
                         <div onclick="selectStopAndClose('${s.stopId}', '${s.name.replace(/'/g, "\\'")}', ${s.seq})" class="p-2 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between text-xs transition">
@@ -1307,7 +1218,9 @@
             updateFavButtonState();
         }
 
-        // 重新設計之合辦路線對齊邏輯：經多維度（站名/目的地/相對比率）精準匹配
+        /**
+         * 專家修復核心邏輯：合辦路線對齊技術 (Terminus & Name Similarity Matching)
+         */
         async function fetchCoCompanyData(route, bound, seq, currentComp) {
             const coComp = (currentComp === 'kmb') ? 'ctb' : 'kmb';
 
@@ -1332,115 +1245,124 @@
 
                 if (outStops.length === 0 && inStops.length === 0) return null;
 
-                const getStopName = async (stopId) => {
+                const primaryDest = (currentActiveStop ? (currentActiveStop.dest || '') : '').trim();
+
+                // 取得兩巴終點站站名以進行方向對齊
+                async function getTerminusName(stopsList) {
+                    if (!stopsList || stopsList.length === 0) return '';
+                    const lastStopId = stopsList[stopsList.length - 1].stop;
                     if (coComp === 'kmb') {
-                        if (!kmbStopsDirectory.has(stopId)) {
-                            try {
-                                const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopId}`);
-                                if (sRes.ok) {
-                                    const sData = await sRes.json();
-                                    if (sData && sData.data) kmbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
-                                }
-                            } catch (e) {}
-                        }
-                        return kmbStopsDirectory.get(stopId) || stopId;
-                    } else {
-                        if (!ctbStopsDirectory.has(stopId)) {
-                            try {
-                                const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stopId}`);
-                                if (sRes.ok) {
-                                    const sData = await sRes.json();
-                                    if (sData && sData.data) ctbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
-                                }
-                            } catch (e) {}
-                        }
-                        return ctbStopsDirectory.get(stopId) || stopId;
-                    }
-                };
-
-                const cleanName = (str) => (str || '').replace(/[（）\(\)\s,-]/g, '');
-                const targetStopName = currentActiveStop ? currentActiveStop.stopName : '';
-                const targetDest = currentActiveStop ? currentActiveStop.dest : '';
-                const cleanedTargetName = cleanName(targetStopName);
-                const cleanedTargetDest = cleanName(targetDest);
-
-                const candidates = [];
-                if (outStops.length > 0) candidates.push({ dir: 'outbound', stops: outStops });
-                if (inStops.length > 0) candidates.push({ dir: 'inbound', stops: inStops });
-
-                let bestMatch = null;
-                let highestScore = -1;
-
-                for (const cand of candidates) {
-                    const lastStopObj = cand.stops[cand.stops.length - 1];
-                    const lastStopName = await getStopName(lastStopObj.stop);
-                    const cleanedLastStopName = cleanName(lastStopName);
-
-                    let destMatchBonus = 0;
-                    if (cleanedTargetDest && cleanedLastStopName && (cleanedTargetDest.includes(cleanedLastStopName) || cleanedLastStopName.includes(cleanedTargetDest))) {
-                        destMatchBonus = 15;
-                    }
-
-                    for (let i = 0; i < cand.stops.length; i++) {
-                        const stObj = cand.stops[i];
-                        const stName = await getStopName(stObj.stop);
-                        const cleanedStName = cleanName(stName);
-
-                        let nameScore = 0;
-                        if (cleanedTargetName === cleanedStName) {
-                            nameScore = 100;
-                        } else if (cleanedTargetName && cleanedStName && (cleanedTargetName.includes(cleanedStName) || cleanedStName.includes(cleanedTargetName))) {
-                            nameScore = 80;
-                        }
-
-                        if (nameScore > 0) {
-                            const curTotal = (currentActiveStop && currentActiveStop.totalStops) ? currentActiveStop.totalStops : 30;
-                            const curRatio = seq / curTotal;
-                            const candRatio = (i + 1) / cand.stops.length;
-                            const ratioDiff = Math.abs(curRatio - candRatio);
-                            const ratioBonus = Math.max(0, 20 - ratioDiff * 20);
-
-                            const totalScore = nameScore + destMatchBonus + ratioBonus;
-
-                            if (totalScore > highestScore) {
-                                highestScore = totalScore;
-                                bestMatch = {
-                                    coStopId: stObj.stop,
-                                    coStopName: stName,
-                                    coSeq: stObj.seq || (i + 1),
-                                    targetCoDir: cand.dir,
-                                    apiDir: (cand.dir === 'inbound' || cand.dir === 'I') ? 'I' : 'O'
-                                };
+                        if (!kmbStopsDirectory.has(lastStopId)) {
+                            const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${lastStopId}`);
+                            if (sRes.ok) {
+                                const sData = await sRes.json();
+                                if (sData && sData.data) kmbStopsDirectory.set(lastStopId, sData.data.name_tc || sData.data.name_en);
                             }
                         }
+                        return kmbStopsDirectory.get(lastStopId) || '';
+                    } else {
+                        if (!ctbStopsDirectory.has(lastStopId)) {
+                            const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${lastStopId}`);
+                            if (sRes.ok) {
+                                const sData = await sRes.json();
+                                if (sData && sData.data) ctbStopsDirectory.set(lastStopId, sData.data.name_tc || sData.data.name_en);
+                            }
+                        }
+                        return ctbStopsDirectory.get(lastStopId) || '';
                     }
                 }
 
-                if (!bestMatch) {
-                    const isCurrentInbound = (bound === 'inbound' || bound === 'I');
-                    const fallbackCand = (isCurrentInbound && inStops.length > 0) ? { dir: 'inbound', stops: inStops } : { dir: 'outbound', stops: outStops.length > 0 ? outStops : inStops };
-                    const fallbackSt = fallbackCand.stops[Math.min(seq - 1, fallbackCand.stops.length - 1)];
-                    const fallbackName = await getStopName(fallbackSt.stop);
+                const [outDestName, inDestName] = await Promise.all([
+                    getTerminusName(outStops),
+                    getTerminusName(inStops)
+                ]);
 
-                    bestMatch = {
-                        coStopId: fallbackSt.stop,
-                        coStopName: fallbackName,
-                        coSeq: fallbackSt.seq || seq,
-                        targetCoDir: fallbackCand.dir,
-                        apiDir: (fallbackCand.dir === 'inbound' || fallbackCand.dir === 'I') ? 'I' : 'O'
-                    };
+                // 模糊相似度計算
+                function calcSimilarity(str1, str2) {
+                    if (!str1 || !str2) return 0;
+                    let match = 0;
+                    for (let char of str1) {
+                        if (char !== ' ' && str2.includes(char)) match++;
+                    }
+                    return match;
                 }
 
+                const outScore = calcSimilarity(primaryDest, outDestName);
+                const inScore = calcSimilarity(primaryDest, inDestName);
+
+                let targetCoStops = outStops;
+                let targetCoDir = 'outbound';
+
+                if (inScore > outScore && inStops.length > 0) {
+                    targetCoStops = inStops;
+                    targetCoDir = 'inbound';
+                } else if (outStops.length > 0) {
+                    targetCoStops = outStops;
+                    targetCoDir = 'outbound';
+                } else {
+                    targetCoStops = inStops;
+                    targetCoDir = 'inbound';
+                }
+
+                // 搜尋與當前車站名稱最相似的車站
+                const currentStopName = currentActiveStop ? currentActiveStop.stopName : '';
+                let bestMatchedStop = null;
+
+                for (let i = 0; i < targetCoStops.length; i++) {
+                    const st = targetCoStops[i];
+                    const stId = st.stop;
+                    let stName = stId;
+
+                    if (coComp === 'kmb') {
+                        if (!kmbStopsDirectory.has(stId)) {
+                            const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stId}`);
+                            if (sRes.ok) {
+                                const sData = await sRes.json();
+                                if (sData && sData.data) kmbStopsDirectory.set(stId, sData.data.name_tc || sData.data.name_en);
+                            }
+                        }
+                        stName = kmbStopsDirectory.get(stId) || stId;
+                    } else {
+                        if (!ctbStopsDirectory.has(stId)) {
+                            const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stId}`);
+                            if (sRes.ok) {
+                                const sData = await sRes.json();
+                                if (sData && sData.data) ctbStopsDirectory.set(stId, sData.data.name_tc || sData.data.name_en);
+                            }
+                        }
+                        stName = ctbStopsDirectory.get(stId) || stId;
+                    }
+
+                    if (currentStopName && stName && (currentStopName.includes(stName) || stName.includes(currentStopName))) {
+                        bestMatchedStop = { seq: i + 1, stopId: stId, name: stName };
+                        break;
+                    }
+                }
+
+                // 備用方案：若站名完全無法配對，則採用相對比例索引
+                if (!bestMatchedStop && targetCoStops.length > 0) {
+                    const ratio = (seq - 1) / Math.max(1, (currentActiveStop.totalStops || 1) - 1);
+                    const targetIdx = Math.min(Math.round(ratio * (targetCoStops.length - 1)), targetCoStops.length - 1);
+                    const stObj = targetCoStops[targetIdx];
+                    const stId = stObj.stop;
+                    let stName = (coComp === 'kmb') ? kmbStopsDirectory.get(stId) : ctbStopsDirectory.get(stId);
+                    bestMatchedStop = { seq: targetIdx + 1, stopId: stId, name: stName || stId };
+                }
+
+                if (!bestMatchedStop) return null;
+
                 let coEtas = [];
+                const coApiDir = (targetCoDir === 'inbound' || targetCoDir === 'I') ? 'I' : 'O';
+
                 if (coComp === 'kmb') {
-                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bestMatch.coStopId}`);
+                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bestMatchedStop.stopId}`);
                     if (res.ok) {
                         const data = await res.json();
                         const list = data.data || [];
-                        coEtas = list.filter(item => String(item.route) === String(route) && String(item.dir) === bestMatch.apiDir);
+                        coEtas = list.filter(item => String(item.route) === String(route) && String(item.dir) === coApiDir);
                     }
                 } else {
-                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${bestMatch.coStopId}/${route}`);
+                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${bestMatchedStop.stopId}/${route}`);
                     if (res.ok) {
                         const data = await res.json();
                         const list = data.data || [];
@@ -1448,16 +1370,16 @@
                             let itemDir = item.dir;
                             if (itemDir === 'O') itemDir = 'outbound';
                             if (itemDir === 'I') itemDir = 'inbound';
-                            return itemDir.toLowerCase() === bestMatch.targetCoDir.toLowerCase();
+                            return itemDir.toLowerCase() === targetCoDir.toLowerCase();
                         });
                     }
                 }
 
                 return {
                     coComp: coComp,
-                    coStopId: bestMatch.coStopId,
-                    coStopName: bestMatch.coStopName,
-                    coSeq: bestMatch.coSeq,
+                    coStopId: bestMatchedStop.stopId,
+                    coStopName: bestMatchedStop.name,
+                    coSeq: bestMatchedStop.seq,
                     etas: coEtas
                 };
             } catch (err) {
@@ -1657,12 +1579,7 @@
 
             } catch (err) {
                 console.error("ETA Fetch error:", err);
-                container.innerHTML = `
-                    <div class="text-center py-6 text-rose-400 text-xs">
-                        <i class="fa-solid fa-triangle-exclamation mb-1 text-base"></i>
-                        <p>載入即時預報失敗，請點擊更新按鈕重試</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="text-center py-6 text-rose-400 text-xs"><i class="fa-solid fa-triangle-exclamation mb-1 text-base"></i><p>載入即時預報失敗，請點擊更新按鈕重試</p></div>`;
             }
         }
 
@@ -1746,7 +1663,6 @@
         function loadMtrFavoriteItem(idx) {
             const fav = mtrFavorites[idx];
             if (!fav) return;
-
             document.getElementById('mtrLineSelect').value = fav.line;
             onMtrLineChange();
             document.getElementById('mtrStationSelect').value = fav.station;
@@ -1784,7 +1700,6 @@
 
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
             autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
-
             fetchStopsForSelectedRoute(true);
         }
 
@@ -1798,13 +1713,11 @@
         function openSearchModal() { 
             const routeInput = document.getElementById('routeSearchInput');
             if (routeInput) routeInput.value = '';
-            
             const dropdown = document.getElementById('routeAutocompleteDropdown');
             if (dropdown) {
                 dropdown.innerHTML = '';
                 dropdown.classList.add('hidden');
             }
-
             clearAllStopData();
             document.getElementById('busSearchModal').classList.remove('hidden'); 
             setTimeout(() => { if (routeInput) routeInput.focus(); }, 100);
@@ -1881,9 +1794,7 @@
                 btn.className = "gps-radius-btn bg-slate-800 text-slate-300 hover:bg-emerald-600 hover:text-white text-[10px] font-bold px-2 py-0.5 rounded-lg transition";
             });
             const activeBtn = document.getElementById(`radiusBtn${radius}`);
-            if (activeBtn) {
-                activeBtn.className = "gps-radius-btn bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg transition";
-            }
+            if (activeBtn) activeBtn.className = "gps-radius-btn bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg transition";
             document.getElementById('gpsModalStatus').textContent = `搜尋附近 ${radius < 1000 ? radius + ' 米' : '1 公里'}內的巴士路線`;
             executeGpsSearch();
         }
@@ -1892,12 +1803,8 @@
             const R = 6371000;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return Math.round(R * c);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         }
 
         async function executeGpsSearch() {
@@ -1909,17 +1816,11 @@
                 <div class="text-center py-10 text-slate-500">
                     <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-emerald-400 block"></i>
                     <p class="text-xs font-bold text-slate-300">正在擷取 GPS 定位並檢索九巴及城巴全港站點...</p>
-                    <p class="text-[10px] text-slate-500 mt-1">請確保已允許瀏覽器存取位置權限</p>
                 </div>
             `;
 
             if (!("geolocation" in navigator)) {
-                container.innerHTML = `
-                    <div class="text-center py-10 text-rose-400 text-xs">
-                        <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                        <p>您的裝置不支援 GPS 定位服務</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>您的裝置不支援 GPS 定位服務</p></div>`;
                 isGpsSearching = false;
                 return;
             }
@@ -1932,282 +1833,82 @@
                     try {
                         if (!kmbAllStopsCache) {
                             const res = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop');
-                            if (res.ok) {
-                                const data = await res.json();
-                                kmbAllStopsCache = data.data || [];
-                            }
+                            if (res.ok) kmbAllStopsCache = (await res.json()).data || [];
                         }
-
                         if (!kmbAllRouteStopsCache) {
                             const res = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop');
-                            if (res.ok) {
-                                const data = await res.json();
-                                kmbAllRouteStopsCache = data.data || [];
-                            }
+                            if (res.ok) kmbAllRouteStopsCache = (await res.json()).data || [];
                         }
-
                         if (!ctbAllStopsCache) {
                             const res = await fetch('https://rt.data.gov.hk/v2/transport/citybus/stop/ctb');
-                            if (res.ok) {
-                                const data = await res.json();
-                                ctbAllStopsCache = data.data || [];
-                            }
+                            if (res.ok) ctbAllStopsCache = (await res.json()).data || [];
                         }
 
-                        const matchedRouteCandidates = [];
                         const nearbyKmbStopsMap = new Map();
-
                         if (kmbAllStopsCache) {
                             kmbAllStopsCache.forEach(s => {
-                                const lat = parseFloat(s.lat);
-                                const lng = parseFloat(s.long);
-                                if (!isNaN(lat) && !isNaN(lng)) {
-                                    const dist = calculateDistanceMeters(userLat, userLng, lat, lng);
-                                    if (dist <= currentGpsRadius) {
-                                        nearbyKmbStopsMap.set(s.stop, {
-                                            stopId: s.stop,
-                                            name: s.name_tc || s.name_en,
-                                            distance: dist
-                                        });
-                                    }
-                                }
+                                const dist = calculateDistanceMeters(userLat, userLng, parseFloat(s.lat), parseFloat(s.long));
+                                if (dist <= currentGpsRadius) nearbyKmbStopsMap.set(s.stop, { stopId: s.stop, name: s.name_tc || s.name_en, distance: dist });
                             });
                         }
 
+                        const matchedCandidates = [];
                         if (kmbAllRouteStopsCache) {
                             kmbAllRouteStopsCache.forEach(rs => {
                                 if (nearbyKmbStopsMap.has(rs.stop)) {
                                     const stopInfo = nearbyKmbStopsMap.get(rs.stop);
-                                    let boundVal = rs.bound;
-                                    if (boundVal === 'O') boundVal = 'outbound';
-                                    if (boundVal === 'I') boundVal = 'inbound';
-
+                                    let boundVal = (rs.bound === 'O') ? 'outbound' : (rs.bound === 'I' ? 'inbound' : rs.bound);
                                     const routeVariants = kmbRoutes.filter(r => String(r.route) === String(rs.route));
                                     let destName = '目的車站';
-                                    let origName = '';
                                     if (routeVariants.length > 0) {
-                                        const matchedVar = routeVariants.find(v => {
-                                            let vBound = v.bound;
-                                            if (vBound === 'O') vBound = 'outbound';
-                                            if (vBound === 'I') vBound = 'inbound';
-                                            return vBound === boundVal && String(v.service_type || '1') === String(rs.service_type || '1');
-                                        }) || routeVariants[0];
-
-                                        destName = matchedVar.dest_tc || matchedVar.dest_en || '目的車站';
-                                        origName = matchedVar.orig_tc || matchedVar.orig_en || '';
+                                        const matched = routeVariants.find(v => (v.bound === rs.bound || v.service_type === rs.service_type));
+                                        if (matched) destName = matched.dest_tc || matched.dest_en || destName;
                                     }
-
-                                    matchedRouteCandidates.push({
+                                    matchedCandidates.push({
                                         company: 'kmb',
                                         route: rs.route,
                                         bound: boundVal,
                                         serviceType: rs.service_type || '1',
                                         stopId: rs.stop,
                                         stopName: stopInfo.name,
-                                        seq: parseInt(rs.seq),
-                                        distance: stopInfo.distance,
+                                        seq: rs.seq,
                                         dest: destName,
-                                        orig: origName
+                                        distance: stopInfo.distance
                                     });
                                 }
                             });
                         }
 
-                        matchedRouteCandidates.sort((a, b) => {
-                            if (a.distance !== b.distance) return a.distance - b.distance;
-                            return a.route.localeCompare(b.route, undefined, { numeric: true });
-                        });
+                        matchedCandidates.sort((a, b) => a.distance - b.distance);
+                        const topResults = matchedCandidates.slice(0, 30);
 
-                        const uniqueKeyMap = new Map();
-                        const uniqueResults = [];
-
-                        matchedRouteCandidates.forEach(cand => {
-                            const key = `${cand.company}_${cand.route}_${cand.bound}_${cand.stopId}`;
-                            if (!uniqueKeyMap.has(key)) {
-                                uniqueKeyMap.set(key, true);
-                                uniqueResults.push(cand);
-                            }
-                        });
-
-                        if (uniqueResults.length === 0) {
-                            container.innerHTML = `
-                                <div class="text-center py-10 text-amber-400 text-xs font-bold">
-                                    <i class="fa-solid fa-circle-exclamation text-2xl mb-2 block"></i>
-                                    <p>附近 ${currentGpsRadius} 米內找不到巴士路線</p>
-                                    <p class="text-[10px] text-slate-500 font-normal mt-1">請嘗試放大搜尋範圍（如 500m 或 1km）</p>
-                                </div>
-                            `;
+                        if (topResults.length === 0) {
+                            container.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs"><p>附近 ${currentGpsRadius} 米內未有找到巴士站</p></div>`;
                         } else {
-                            container.innerHTML = uniqueResults.slice(0, 40).map(item => {
-                                const compBadge = item.company === 'kmb' 
-                                    ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">九巴</span>' 
-                                    : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded">城巴</span>';
-                                
-                                return `
-                                    <div onclick='selectGpsRouteItem(${JSON.stringify(item)})' class="bg-slate-900 border border-slate-800 hover:border-indigo-500/60 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm">
-                                        <div class="flex items-center gap-2 overflow-hidden">
-                                            <div class="shrink-0 flex flex-col items-center justify-center min-w-[50px]">
-                                                ${compBadge}
-                                                <span class="font-black text-base text-indigo-400 mt-0.5">${item.route}</span>
-                                            </div>
-                                            <div class="overflow-hidden">
-                                                <div class="font-bold text-xs text-slate-100 truncate">${item.stopName}</div>
-                                                <div class="text-[10px] text-slate-400 truncate mt-0.5">往 ${item.dest} (第 ${item.seq} 站)</div>
-                                            </div>
-                                        </div>
-                                        <div class="text-right shrink-0">
-                                            <span class="text-xs font-bold text-emerald-400">${item.distance} 米</span>
-                                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 ml-1"></i>
-                                        </div>
+                            container.innerHTML = topResults.map(item => `
+                                <div onclick="loadFavoriteItem(${JSON.stringify(item).replace(/"/g, '&quot;')}); closeGpsSearchModal();" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2 overflow-hidden">
+                                        <span class="bg-rose-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] shrink-0">九巴</span>
+                                        <span class="font-extrabold text-indigo-400 text-sm shrink-0">${item.route}</span>
+                                        <span class="text-slate-300 font-bold truncate">往 ${item.dest} (${item.stopName})</span>
                                     </div>
-                                `;
-                            }).join('');
+                                    <span class="text-emerald-400 font-bold text-[10px] shrink-0 ml-1">${item.distance}m</span>
+                                </div>
+                            `).join('');
                         }
-
                     } catch (err) {
-                        console.error("GPS Search Error:", err);
-                        container.innerHTML = `
-                            <div class="text-center py-10 text-rose-400 text-xs">
-                                <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                                <p>搜尋附近路線時發生錯誤，請重試</p>
-                            </div>
-                        `;
+                        console.error("GPS Error:", err);
+                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>GPS 檢索失敗，請重試</p></div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
                 (err) => {
-                    console.error("Geolocation Error:", err);
-                    container.innerHTML = `
-                        <div class="text-center py-10 text-rose-400 text-xs">
-                            <i class="fa-solid fa-location-slash text-2xl mb-2 block"></i>
-                            <p>無法取得您的當前位置，請檢查手機 GPS 及存取權限</p>
-                        </div>
-                    `;
+                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取定位權限</p></div>`;
                     isGpsSearching = false;
                 },
-                { timeout: 10000, maximumAge: 10000, enableHighAccuracy: true }
+                { timeout: 10000, enableHighAccuracy: true }
             );
-        }
-
-        function selectGpsRouteItem(item) {
-            currentCompany = item.company;
-            selectedRoute = item.route;
-            selectedBound = {
-                bound: item.bound,
-                serviceType: item.serviceType || '1',
-                orig: item.orig || '',
-                dest: item.dest || ''
-            };
-
-            currentActiveStop = {
-                company: item.company,
-                route: item.route,
-                bound: item.bound,
-                orig: item.orig || '',
-                dest: item.dest || '',
-                serviceType: item.serviceType || '1',
-                stopId: item.stopId,
-                stopName: item.stopName,
-                seq: item.seq,
-                totalStops: 30
-            };
-
-            closeGpsSearchModal();
-            renderActiveStopDashboard();
-            fetchRealTimeETA();
-
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
-
-            fetchStopsForSelectedRoute(true);
-        }
-
-        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
-        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
-        function toggleApiKeyInput() { document.getElementById('apiKeyPanel').classList.toggle('hidden'); }
-        function saveApiKey() {
-            const val = document.getElementById('geminiApiKeyInput').value.trim();
-            userApiKey = val;
-            localStorage.setItem('gemini_custom_apikey', val);
-            alert("API Key 已儲存！");
-            toggleApiKeyInput();
-        }
-
-        async function sendAiMessage() {
-            const input = document.getElementById('aiInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-
-            const chatBox = document.getElementById('aiChatBox');
-            chatBox.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow-sm">
-                        ${msg}
-                    </div>
-                </div>
-            `;
-            input.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            const loadingId = 'ai-loading-' + Date.now();
-            chatBox.innerHTML += `
-                <div id="${loadingId}" class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-300 leading-relaxed flex items-center gap-2">
-                    <i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i>
-                    <span>Gemini AI 正在思考中...</span>
-                </div>
-            `;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                const apiKeyToUse = userApiKey;
-                if (!apiKeyToUse) {
-                    document.getElementById(loadingId).remove();
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-rose-500/40 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            請先點擊右上角「金鑰」輸入您的 Gemini API Key 才能使用 AI 助手功能。
-                        </div>
-                    `;
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                    return;
-                }
-
-                aiChatHistory.push({ role: "user", parts: [{ text: msg }] });
-
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: aiChatHistory })
-                });
-
-                document.getElementById(loadingId).remove();
-
-                if (res.ok) {
-                    const data = await res.json();
-                    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，目前無法回應。";
-                    aiChatHistory.push({ role: "model", parts: [{ text: replyText }] });
-
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
-                            ${replyText.replace(/\n/g, '<br>')}
-                        </div>
-                    `;
-                } else {
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-rose-500/40 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            呼叫 AI 失敗，請檢查 API Key 是否正確。
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                if (document.getElementById(loadingId)) document.getElementById(loadingId).remove();
-                chatBox.innerHTML += `
-                    <div class="bg-slate-800 border border-rose-500/40 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        連線失敗，請檢查網絡狀態。
-                    </div>
-                `;
-            }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
