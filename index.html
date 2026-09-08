@@ -218,9 +218,10 @@
         <!-- Favorites Footer Carousel Section -->
         <footer id="favoritesFooter" class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 shadow-lg shrink-0">
             <div class="flex items-center justify-between mb-1.5 px-0.5">
-                <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <!-- 需求 2 & 需求 3: 將標題文字改為 "收藏車站"，並將字體大小增加 4px (text-xs [12px] -> text-base [16px]) -->
+                <h3 class="text-base font-bold text-slate-300 flex items-center gap-1.5">
                     <i class="fa-solid fa-star text-amber-400 text-xs"></i>
-                    <span id="favFooterTitle">我的 MTR 收藏車站</span>
+                    <span id="favFooterTitle">收藏車站</span>
                 </h3>
             </div>
             
@@ -492,7 +493,6 @@
         let autoRefreshTimer = null;
         let mtrAutoRefreshTimer = null;
 
-        // 【新增】：追蹤巴士到達後的 30 秒倒數計時
         let busArrivingTracker = {};
 
         let selectedMtrLine = '';
@@ -752,30 +752,35 @@
 
                         let takeCount = 2;
 
-                        const isAdmUpToLowLmc = (lineCode === 'EAL' && selectedMtrStation === 'ADM' && dir === 'UP');
-                        const isLowDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LOW' && dir === 'DOWN');
-                        const isLmcDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LMC' && dir === 'DOWN');
-
-                        if (isAdmUpToLowLmc || isLowDownToAdm || isLmcDownToAdm) {
+                        // 需求 1: 康城站 (LHP) 往北角/調景嶺方向 (UP 方向) 顯示班次改為 4 班
+                        if (lineCode === 'TKL' && selectedMtrStation === 'LHP' && dir === 'UP') {
                             takeCount = 4;
-                        } else if (lineCode === 'EAL') {
-                            takeCount = 2;
-                        } else if (!isInterchange && !isTermInThisLine) {
-                            takeCount = 2;
                         } else {
-                            const isExcludedTerminal = ["NOP", "ADM", "TIK"].includes(selectedMtrStation);
-                            if (isTermInThisLine && !isExcludedTerminal) {
-                                takeCount = 4;
-                            }
+                            const isAdmUpToLowLmc = (lineCode === 'EAL' && selectedMtrStation === 'ADM' && dir === 'UP');
+                            const isLowDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LOW' && dir === 'DOWN');
+                            const isLmcDownToAdm = (lineCode === 'EAL' && selectedMtrStation === 'LMC' && dir === 'DOWN');
 
-                            if (selectedMtrStation === 'NOP' && trains.some(t => t.dest === 'POA' || t.dest === 'LHP')) {
+                            if (isAdmUpToLowLmc || isLowDownToAdm || isLmcDownToAdm) {
                                 takeCount = 4;
-                            }
-                            else if (selectedMtrStation === 'TIK' && trains.some(t => t.dest === 'WHA')) {
-                                takeCount = 4;
-                            }
-                            else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'SOH')) {
-                                takeCount = 4;
+                            } else if (lineCode === 'EAL') {
+                                takeCount = 2;
+                            } else if (!isInterchange && !isTermInThisLine) {
+                                takeCount = 2;
+                            } else {
+                                const isExcludedTerminal = ["NOP", "ADM", "TIK"].includes(selectedMtrStation);
+                                if (isTermInThisLine && !isExcludedTerminal) {
+                                    takeCount = 4;
+                                }
+
+                                if (selectedMtrStation === 'NOP' && trains.some(t => t.dest === 'POA' || t.dest === 'LHP')) {
+                                    takeCount = 4;
+                                }
+                                else if (selectedMtrStation === 'TIK' && trains.some(t => t.dest === 'WHA')) {
+                                    takeCount = 4;
+                                }
+                                else if (selectedMtrStation === 'ADM' && trains.some(t => t.dest === 'SOH')) {
+                                    takeCount = 4;
+                                }
                             }
                         }
 
@@ -1296,7 +1301,6 @@
             updateFavButtonState();
         }
 
-        // 【修改核心】：加入 30 秒過期邏輯與班次替換機制，且字眼無底色並改為粗體
         async function fetchRealTimeETA() {
             if (!currentActiveStop) return;
 
@@ -1344,7 +1348,6 @@
                     }
                 }
 
-                // 過濾並處理 30 秒緩衝時間
                 const validEtas = [];
                 
                 etas.forEach((item) => {
@@ -1355,12 +1358,10 @@
                     const busKey = `${item.route}_${item.eta}_${item.eta_seq || ''}`;
 
                     if (diffMs <= 0) {
-                        // 首次進入已到達狀態，記錄時間戳
                         if (!busArrivingTracker[busKey]) {
                             busArrivingTracker[busKey] = nowMs;
                         }
 
-                        // 30 秒之內 (30000毫秒) 顯示為「正在離開」，超過則過濾掉由下一班頂替
                         const elapsedSec = (nowMs - busArrivingTracker[busKey]) / 1000;
                         if (elapsedSec <= 30) {
                             validEtas.push({ ...item, isLeaving: true });
@@ -1389,7 +1390,6 @@
 
                     let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
                     
-                    // 【優化】：取消底色，改為橙黃色粗體字顯示 "正在離開" 或 "即將到達"
                     if (item.isLeaving) {
                         timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
                     } else if (diffSec <= 0 && diffSec >= -30) {
@@ -1492,7 +1492,8 @@
                     `;
                 }).join('');
             } else {
-                title.textContent = "我的 MTR 收藏車站";
+                // 需求 3: 切換為 MTR 模式時，標題保持為 "收藏車站" (而非原先的 "我的 MTR 收藏車站")
+                title.textContent = "收藏車站";
                 if (!mtrFavorites || mtrFavorites.length === 0) {
                     section.innerHTML = `<div class="text-slate-500 text-xs py-1 px-1">未有 MTR 收藏，選擇鐵路站時點擊「收藏」即可儲存</div>`;
                     return;
@@ -1986,8 +1987,8 @@
                 }
 
                 const data = await response.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法回答這個問題。";
-
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "對不起，未能取得 AI 回應。";
+                
                 aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
 
                 aiChatBox.innerHTML += `
@@ -1995,19 +1996,17 @@
                         ${reply.replace(/\n/g, '<br>')}
                     </div>
                 `;
-                chatBox.scrollTop = chatBox.scrollHeight;
-
             } catch (err) {
-                const el = document.getElementById(loadingId);
-                if (el) el.remove();
-
+                if (document.getElementById(loadingId)) {
+                    document.getElementById(loadingId).remove();
+                }
                 aiChatBox.innerHTML += `
-                    <div class="bg-rose-950/60 border border-rose-500/40 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300 leading-relaxed">
-                        發生錯誤：${err.message}。<br>請點擊右上角「金鑰」輸入有效的 Gemini API Key。
+                    <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300">
+                        連線失敗：${err.message}
                     </div>
                 `;
-                chatBox.scrollTop = chatBox.scrollHeight;
             }
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
