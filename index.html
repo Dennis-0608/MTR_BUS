@@ -327,7 +327,7 @@
                     </div>
                     <div>
                         <h3 class="text-xs font-bold text-slate-100">Gemini AI 巴士交通助手</h3>
-                        <p class="text-[9px] text-emerald-400">Gemini 2.5 Engine Active</p>
+                        <p class="text-[9px] text-emerald-400">Gemini Engine Active</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
@@ -523,6 +523,19 @@
             switchMode('mtr');
             renderFavorites();
         };
+
+        function isJointRoute(routeNum) {
+            if (!routeNum) return false;
+            const r = String(routeNum).trim().toUpperCase();
+            
+            // 過海隧巴及特快/通宵隧巴特徵（1xx, 3xx, 6xx, 9xx, N1xx, N3xx, N6xx, N9xx, X9xx, H1, H2等）
+            const jointPattern = /^(1|3|6|9|N1|N3|N6|N9|X9|H1|H2)\d{2}[A-Z]?$/;
+            
+            const existsInKmb = kmbRoutes.some(item => String(item.route).toUpperCase() === r);
+            const existsInCtb = ctbRoutes.some(item => String(item.route).toUpperCase() === r);
+
+            return jointPattern.test(r) && existsInKmb && existsInCtb;
+        }
 
         function switchMode(mode) {
             currentMode = mode;
@@ -743,7 +756,6 @@
 
                         let takeCount = 2;
 
-                        // 核心修復：康城站 (LHP) 為支線終點站，無論 API 返還 UP 或 DOWN 方向，統一開放提取 4 個班次
                         if (selectedMtrStation === 'LHP') {
                             takeCount = 4;
                         } else {
@@ -1296,6 +1308,85 @@
             updateFavButtonState();
         }
 
+        async function fetchCoCompanyData(route, bound, seq, currentComp) {
+            const coComp = (currentComp === 'kmb') ? 'ctb' : 'kmb';
+            const dirStr = (bound === 'inbound' || bound === 'I') ? 'inbound' : 'outbound';
+
+            try {
+                let coStops = [];
+                if (coComp === 'kmb') {
+                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/${dirStr}/1`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        coStops = data.data || [];
+                    }
+                } else {
+                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dirStr}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        coStops = data.data || [];
+                    }
+                }
+
+                if (coStops.length === 0) return null;
+
+                const matchedStopObj = coStops.find(s => Number(s.seq) === Number(seq)) || coStops[Math.min(seq - 1, coStops.length - 1)];
+                if (!matchedStopObj) return null;
+
+                const coStopId = matchedStopObj.stop;
+                let coStopName = coStopId;
+
+                if (coComp === 'kmb') {
+                    if (!kmbStopsDirectory.has(coStopId)) {
+                        const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${coStopId}`);
+                        if (sRes.ok) {
+                            const sData = await sRes.json();
+                            if (sData && sData.data) kmbStopsDirectory.set(coStopId, sData.data.name_tc || sData.data.name_en);
+                        }
+                    }
+                    coStopName = kmbStopsDirectory.get(coStopId) || coStopId;
+                } else {
+                    if (!ctbStopsDirectory.has(coStopId)) {
+                        const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${coStopId}`);
+                        if (sRes.ok) {
+                            const sData = await sRes.json();
+                            if (sData && sData.data) ctbStopsDirectory.set(coStopId, sData.data.name_tc || sData.data.name_en);
+                        }
+                    }
+                    coStopName = ctbStopsDirectory.get(coStopId) || coStopId;
+                }
+
+                let coEtas = [];
+                const targetDir = (bound === 'inbound' || bound === 'I') ? 'I' : 'O';
+
+                if (coComp === 'kmb') {
+                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${coStopId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const list = data.data || [];
+                        coEtas = list.filter(item => String(item.route) === String(route) && String(item.dir) === targetDir);
+                    }
+                } else {
+                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${coStopId}/${route}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        coEtas = data.data || [];
+                    }
+                }
+
+                return {
+                    coComp: coComp,
+                    coStopId: coStopId,
+                    coStopName: coStopName,
+                    coSeq: matchedStopObj.seq,
+                    etas: coEtas
+                };
+            } catch (err) {
+                console.error("Co-company fetch error:", err);
+                return null;
+            }
+        }
+
         async function fetchRealTimeETA() {
             if (!currentActiveStop) return;
 
@@ -1305,46 +1396,56 @@
             const nowMs = now.getTime();
             refreshTimeEl.textContent = now.toLocaleTimeString('zh-HK', { hour12: false });
 
+            const isJoint = isJointRoute(currentActiveStop.route);
+
             try {
                 let etas = [];
                 const targetDir = (currentActiveStop.bound === 'inbound' || currentActiveStop.bound === 'I') ? 'I' : 'O';
 
-                if (currentActiveStop.company === 'kmb') {
-                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${currentActiveStop.stopId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const list = data.data || [];
-                        const targetServiceType = String(currentActiveStop.serviceType || '1');
-                        
-                        etas = list.filter(item => 
-                            String(item.route) === String(currentActiveStop.route) && 
-                            String(item.dir) === targetDir && 
-                            String(item.service_type) === targetServiceType
-                        );
-
-                        if (etas.length === 0) {
+                const fetchPrimaryPromise = (async () => {
+                    if (currentActiveStop.company === 'kmb') {
+                        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${currentActiveStop.stopId}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const list = data.data || [];
+                            const targetServiceType = String(currentActiveStop.serviceType || '1');
+                            
                             etas = list.filter(item => 
                                 String(item.route) === String(currentActiveStop.route) && 
-                                String(item.dir) === targetDir
+                                String(item.dir) === targetDir && 
+                                String(item.service_type) === targetServiceType
                             );
+
+                            if (etas.length === 0) {
+                                etas = list.filter(item => 
+                                    String(item.route) === String(currentActiveStop.route) && 
+                                    String(item.dir) === targetDir
+                                );
+                            }
+                        }
+                    } else {
+                        const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${currentActiveStop.stopId}/${currentActiveStop.route}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const list = data.data || [];
+                            etas = list.filter(item => {
+                                let itemDir = item.dir;
+                                if (itemDir === 'O') itemDir = 'outbound';
+                                if (itemDir === 'I') itemDir = 'inbound';
+                                return itemDir.toLowerCase() === currentActiveStop.bound.toLowerCase() || true;
+                            });
                         }
                     }
-                } else {
-                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/ctb/${currentActiveStop.stopId}/${currentActiveStop.route}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const list = data.data || [];
-                        etas = list.filter(item => {
-                            let itemDir = item.dir;
-                            if (itemDir === 'O') itemDir = 'outbound';
-                            if (itemDir === 'I') itemDir = 'inbound';
-                            return itemDir.toLowerCase() === currentActiveStop.bound.toLowerCase() || true;
-                        });
-                    }
+                })();
+
+                let coCompanyResult = null;
+                if (isJoint) {
+                    coCompanyResult = await fetchCoCompanyData(currentActiveStop.route, currentActiveStop.bound, currentActiveStop.seq, currentActiveStop.company);
                 }
 
+                await fetchPrimaryPromise;
+
                 const validEtas = [];
-                
                 etas.forEach((item) => {
                     if (!item.eta) return;
                     
@@ -1366,56 +1467,114 @@
                     }
                 });
 
+                let htmlContent = '';
+
                 if (validEtas.length === 0) {
-                    container.innerHTML = `
-                        <div class="text-center py-8 text-slate-500">
+                    htmlContent += `
+                        <div class="text-center py-6 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
                             <p class="text-sm font-bold text-slate-300">暫時沒有此方向的即時班次資料</p>
                             <p class="text-xs text-slate-500 mt-1">可能非服務時間或尾班車已過</p>
                         </div>
                     `;
-                    return;
-                }
+                } else {
+                    htmlContent += validEtas.slice(0, 3).map((item, idx) => {
+                        const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const diffMs = new Date(item.eta) - now;
+                        const diffSec = Math.floor(diffMs / 1000);
+                        const diffMins = Math.max(0, Math.floor(diffMs / 60000));
 
-                container.innerHTML = validEtas.slice(0, 4).map((item, idx) => {
-                    const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    const diffMs = new Date(item.eta) - now;
-                    const diffSec = Math.floor(diffMs / 1000);
-                    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+                        let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
+                        
+                        if (item.isLeaving) {
+                            timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
+                        } else if (diffSec <= 0 && diffSec >= -30) {
+                            timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
+                        } else if (diffSec > 0 && diffSec <= 60) {
+                            timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">即將到達</span>`;
+                        }
 
-                    let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
-                    
-                    if (item.isLeaving) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
-                    } else if (diffSec <= 0 && diffSec >= -30) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
-                    } else if (diffSec > 0 && diffSec <= 60) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">即將到達</span>`;
-                    }
+                        let remark = item.rmk_tc || item.remark_tc || '實時班次';
+                        if (remark.includes('原定')) remark = '原定班次';
 
-                    let remark = item.rmk_tc || item.remark_tc || '實時班次';
-                    if (remark.includes('原定')) remark = '原定班次';
+                        const destName = currentActiveStop.dest || item.dest_tc || '終點站';
 
-                    const destName = currentActiveStop.dest || item.dest_tc || '終點站';
-
-                    return `
-                        <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
-                            <div class="flex items-center gap-2.5 overflow-hidden">
-                                <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-black text-slate-300 shrink-0">
-                                    ${idx + 1}
+                        return `
+                            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                                <div class="flex items-center gap-2.5 overflow-hidden">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-black text-slate-300 shrink-0">
+                                        ${idx + 1}
+                                    </div>
+                                    <div class="overflow-hidden">
+                                        <h4 class="font-bold text-lg text-slate-100 truncate">往 ${destName}</h4>
+                                        <p class="text-xs text-slate-400 truncate mt-0.5">${remark}</p>
+                                    </div>
                                 </div>
-                                <div class="overflow-hidden">
-                                    <h4 class="font-bold text-lg text-slate-100 truncate">往 ${destName}</h4>
-                                    <p class="text-xs text-slate-400 truncate mt-0.5">${remark}</p>
+                                <div class="text-right shrink-0">
+                                    ${timeBadge}
+                                    <div class="text-xs text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
                                 </div>
                             </div>
-                            <div class="text-right shrink-0">
-                                ${timeBadge}
-                                <div class="text-xs text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
+                        `;
+                    }).join('');
+                }
+
+                if (isJoint && coCompanyResult) {
+                    const coCompName = coCompanyResult.coComp === 'kmb' ? '九巴 (KMB)' : '城巴 (CTB)';
+                    const badgeClass = coCompanyResult.coComp === 'kmb' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950';
+                    
+                    const coValidEtas = [];
+                    (coCompanyResult.etas || []).forEach((item) => {
+                        if (!item.eta) return;
+                        const etaMs = new Date(item.eta).getTime();
+                        const diffMs = etaMs - nowMs;
+                        if (diffMs >= -30000) {
+                            coValidEtas.push(item);
+                        }
+                    });
+
+                    let coEtaRows = '';
+                    if (coValidEtas.length === 0) {
+                        coEtaRows = `<p class="text-xs text-slate-500 text-center py-2">合辦公司暫無即時預報班次</p>`;
+                    } else {
+                        coEtaRows = coValidEtas.slice(0, 3).map((item, idx) => {
+                            const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+                            const diffMs = new Date(item.eta) - now;
+                            const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+                            return `
+                                <div class="flex items-center justify-between py-1 border-b border-slate-800/50 last:border-0 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">${idx + 1}</span>
+                                        <span class="text-slate-300 font-semibold">往 ${currentActiveStop.dest || '目的車站'}</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="font-extrabold text-amber-400 text-sm">${diffMins} 分鐘</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(${etaTimeStr})</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+
+                    htmlContent += `
+                        <div class="mt-3 pt-3 border-t border-slate-800/80">
+                            <div class="bg-slate-950/80 border border-indigo-500/30 rounded-xl p-2.5 shadow-md">
+                                <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-800/80">
+                                    <div class="flex items-center gap-1.5 overflow-hidden">
+                                        <span class="${badgeClass} text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">${coCompName}</span>
+                                        <span class="text-xs font-bold text-indigo-300 truncate">合辦路線對應第 ${coCompanyResult.coSeq} 站：${coCompanyResult.coStopName}</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-400 shrink-0">最近3班</span>
+                                </div>
+                                <div class="space-y-1">
+                                    ${coEtaRows}
+                                </div>
                             </div>
                         </div>
                     `;
-                }).join('');
+                }
+
+                container.innerHTML = htmlContent;
 
             } catch (err) {
                 console.error("ETA Fetch error:", err);
@@ -1982,12 +2141,11 @@
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
                         <div class="bg-rose-900/60 border border-rose-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
-                            連線失敗，請檢查 API Key 或網路設定。
+                            暫時無法連接 Gemini AI。請檢查網路或確認是否已設定正確的 API Key。
                         </div>
                     </div>
                 `;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
