@@ -215,7 +215,7 @@
 
         </main>
 
-        <!-- Favorites Footer Section (Removed Sidebars) -->
+        <!-- Favorites Footer Section -->
         <footer id="favoritesFooter" class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 shadow-lg shrink-0">
             <div class="flex items-center justify-between mb-1.5 px-0.5">
                 <h3 class="text-base font-bold text-slate-300 flex items-center gap-1.5">
@@ -743,8 +743,8 @@
 
                         let takeCount = 2;
 
-                        // 修復：康城站 (LHP) 往調景嶺/北角方向 (UP) 設為最高優先級，確保顯示 4 個班次
-                        if (lineCode === 'TKL' && selectedMtrStation === 'LHP' && dir === 'UP') {
+                        // 核心修復：康城站 (LHP) 為支線終點站，無論 API 返還 UP 或 DOWN 方向，統一開放提取 4 個班次
+                        if (selectedMtrStation === 'LHP') {
                             takeCount = 4;
                         } else {
                             const isAdmUpToLowLmc = (lineCode === 'EAL' && selectedMtrStation === 'ADM' && dir === 'UP');
@@ -852,7 +852,6 @@
             }
         }
 
-        // 修改：警示標語簡化為「收藏車站已達上限 (最多 3 個)！」
         function toggleMtrFavorite() {
             if (!selectedMtrStation) return;
             const lineToSave = selectedMtrLine || (stationToLinesMap.get(selectedMtrStation) || [])[0] || '';
