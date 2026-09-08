@@ -493,6 +493,7 @@
         let selectedMtrFilterLine = 'ALL';
 
         const peerStopCache = new Map();
+        const stopDetailsDirectory = new Map();
 
         const hkDistricts = [
             { name: '尖沙咀', hkoName: '香港天文台', lat: 22.3019, lng: 114.1742 },
@@ -534,8 +535,70 @@
             return kmbRouteSet.has(rUpper) && ctbRouteSet.has(rUpper);
         }
 
-        async function getPeerStopId(route, bound, company, seq, serviceType = '1') {
-            const cacheKey = `${company}_${route}_${bound}_${seq}_${serviceType}`;
+        async function fetchStopDetails(company, stopId) {
+            const key = `${company}_${stopId}`;
+            if (stopDetailsDirectory.has(key)) {
+                return stopDetailsDirectory.get(key);
+            }
+
+            try {
+                if (company === 'kmb') {
+                    if (kmbAllStopsCache) {
+                        const found = kmbAllStopsCache.find(s => s.stop === stopId);
+                        if (found) {
+                            const info = { stopId, name: found.name_tc || found.name_en || '', lat: parseFloat(found.lat), lng: parseFloat(found.long) };
+                            stopDetailsDirectory.set(key, info);
+                            return info;
+                        }
+                    }
+                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.data) {
+                            const info = { stopId, name: data.data.name_tc || data.data.name_en || '', lat: parseFloat(data.data.lat), lng: parseFloat(data.data.long) };
+                            stopDetailsDirectory.set(key, info);
+                            return info;
+                        }
+                    }
+                } else {
+                    if (ctbAllStopsCache) {
+                        const found = ctbAllStopsCache.find(s => s.stop === stopId);
+                        if (found) {
+                            const info = { stopId, name: found.name_tc || found.name_en || '', lat: parseFloat(found.lat), lng: parseFloat(found.long) };
+                            stopDetailsDirectory.set(key, info);
+                            return info;
+                        }
+                    }
+                    const res = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stopId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.data) {
+                            const info = { stopId, name: data.data.name_tc || data.data.name_en || '', lat: parseFloat(data.data.lat), lng: parseFloat(data.data.long) };
+                            stopDetailsDirectory.set(key, info);
+                            return info;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error fetching stop details:", e);
+            }
+
+            const fallback = { stopId, name: '', lat: NaN, lng: NaN };
+            stopDetailsDirectory.set(key, fallback);
+            return fallback;
+        }
+
+        function cleanStopName(name) {
+            if (!name) return '';
+            return String(name)
+                .replace(/（[^）]*）|\([^)]*\)/g, '')
+                .replace(/[,，;；].*$/, '')
+                .replace(/(轉車站|收費廣場|總站|巴士總站)/g, '')
+                .trim();
+        }
+
+        async function getPeerStopId(route, bound, company, seq, serviceType = '1', refStopId = null, refStopName = '') {
+            const cacheKey = `${company}_${route}_${bound}_${refStopId || seq}_${serviceType}`;
             if (peerStopCache.has(cacheKey)) {
                 return peerStopCache.get(cacheKey);
             }
@@ -561,15 +624,54 @@
 
                 if (peerStops.length === 0) return null;
 
-                let matched = peerStops.find(s => s.seq === seq);
-                if (!matched && peerStops.length >= seq) {
-                    matched = peerStops[seq - 1];
-                }
-                if (!matched && peerStops.length > 0) {
-                    matched = peerStops[0];
+                let refInfo = null;
+                if (refStopId) {
+                    refInfo = await fetchStopDetails(company, refStopId);
                 }
 
-                const peerStopId = matched ? matched.stop : null;
+                const cleanedRefName = cleanStopName(refInfo?.name || refStopName);
+
+                let bestMatch = null;
+                let minDistance = Infinity;
+                let bestNameMatch = null;
+
+                const peerDetailsPromises = peerStops.map(s => fetchStopDetails(peerCompany, s.stop));
+                const peerDetailsList = await Promise.all(peerDetailsPromises);
+
+                for (let i = 0; i < peerStops.length; i++) {
+                    const pStop = peerStops[i];
+                    const pDetail = peerDetailsList[i];
+                    const cleanedPName = cleanStopName(pDetail?.name);
+
+                    if (refInfo && !isNaN(refInfo.lat) && !isNaN(refInfo.lng) && pDetail && !isNaN(pDetail.lat) && !isNaN(pDetail.lng)) {
+                        const dist = calculateDistanceMeters(refInfo.lat, refInfo.lng, pDetail.lat, pDetail.lng);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMatch = pStop;
+                        }
+                    }
+
+                    if (cleanedRefName && cleanedPName) {
+                        if (cleanedRefName === cleanedPName || cleanedRefName.includes(cleanedPName) || cleanedPName.includes(cleanedRefName)) {
+                            if (!bestNameMatch || Math.abs(pStop.seq - seq) < Math.abs(bestNameMatch.seq - seq)) {
+                                bestNameMatch = pStop;
+                            }
+                        }
+                    }
+                }
+
+                let selectedPeerStop = null;
+                if (minDistance < 120 && bestMatch) {
+                    selectedPeerStop = bestMatch;
+                } else if (bestNameMatch) {
+                    selectedPeerStop = bestNameMatch;
+                } else if (bestMatch) {
+                    selectedPeerStop = bestMatch;
+                } else {
+                    selectedPeerStop = peerStops.find(s => s.seq === seq) || peerStops[seq - 1] || peerStops[0];
+                }
+
+                const peerStopId = selectedPeerStop ? selectedPeerStop.stop : null;
                 if (peerStopId) {
                     peerStopCache.set(cacheKey, peerStopId);
                 }
@@ -1368,15 +1470,15 @@
                 const targetServiceType = String(serviceType || '1');
 
                 let etas = list.filter(item => 
-                    String(item.route) === String(route) && 
-                    String(item.dir) === targetDir && 
-                    String(item.service_type) === targetServiceType
+                    String(item.route).toUpperCase() === String(route).toUpperCase() && 
+                    String(item.dir).toUpperCase() === targetDir && 
+                    String(item.service_type || '1') === targetServiceType
                 );
 
                 if (etas.length === 0) {
                     etas = list.filter(item => 
-                        String(item.route) === String(route) && 
-                        String(item.dir) === targetDir
+                        String(item.route).toUpperCase() === String(route).toUpperCase() && 
+                        String(item.dir).toUpperCase() === targetDir
                     );
                 }
 
@@ -1396,12 +1498,13 @@
                 const data = await res.json();
                 const list = data.data || [];
                 
-                const normBound = (bound === 'I' || bound === 'inbound') ? 'inbound' : 'outbound';
+                const normBound = (bound === 'I' || bound === 'inbound') ? 'I' : 'O';
                 const etas = list.filter(item => {
-                    let itemDir = item.dir;
-                    if (itemDir === 'O') itemDir = 'outbound';
-                    if (itemDir === 'I') itemDir = 'inbound';
-                    return itemDir.toLowerCase() === normBound || true;
+                    if (!item.dir) return true;
+                    let itemDir = String(item.dir).toUpperCase();
+                    if (itemDir === 'INBOUND' || itemDir === 'I') itemDir = 'I';
+                    if (itemDir === 'OUTBOUND' || itemDir === 'O') itemDir = 'O';
+                    return itemDir === normBound;
                 });
 
                 return etas.map(item => ({
@@ -1431,7 +1534,15 @@
                     if (currentActiveStop.company === 'kmb') {
                         kmbPromise = fetchKmbETA(currentActiveStop.stopId, currentActiveStop.route, currentActiveStop.bound, currentActiveStop.serviceType);
                         ctbPromise = (async () => {
-                            const peerStopId = await getPeerStopId(currentActiveStop.route, currentActiveStop.bound, 'kmb', currentActiveStop.seq, currentActiveStop.serviceType);
+                            const peerStopId = await getPeerStopId(
+                                currentActiveStop.route,
+                                currentActiveStop.bound,
+                                'kmb',
+                                currentActiveStop.seq,
+                                currentActiveStop.serviceType,
+                                currentActiveStop.stopId,
+                                currentActiveStop.stopName
+                            );
                             if (peerStopId) {
                                 return fetchCtbETA(peerStopId, currentActiveStop.route, currentActiveStop.bound);
                             }
@@ -1440,7 +1551,15 @@
                     } else {
                         ctbPromise = fetchCtbETA(currentActiveStop.stopId, currentActiveStop.route, currentActiveStop.bound);
                         kmbPromise = (async () => {
-                            const peerStopId = await getPeerStopId(currentActiveStop.route, currentActiveStop.bound, 'ctb', currentActiveStop.seq, currentActiveStop.serviceType);
+                            const peerStopId = await getPeerStopId(
+                                currentActiveStop.route,
+                                currentActiveStop.bound,
+                                'ctb',
+                                currentActiveStop.seq,
+                                currentActiveStop.serviceType,
+                                currentActiveStop.stopId,
+                                currentActiveStop.stopName
+                            );
                             if (peerStopId) {
                                 return fetchKmbETA(peerStopId, currentActiveStop.route, currentActiveStop.bound, currentActiveStop.serviceType);
                             }
@@ -1497,7 +1616,7 @@
                     return;
                 }
 
-                const displayLimit = isJoint ? 3 : 4;
+                const displayLimit = isJoint ? 5 : 4;
 
                 container.innerHTML = validEtas.slice(0, displayLimit).map((item, idx) => {
                     const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -1982,141 +2101,161 @@
                         container.innerHTML = `
                             <div class="text-center py-10 text-rose-400 text-xs">
                                 <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                                <p>搜尋附近車站時發生錯誤，請重試</p>
+                                <p>GPS 檢索發生錯誤，請稍後重試</p>
                             </div>
                         `;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
-                (error) => {
-                    isGpsSearching = false;
+                (err) => {
+                    console.error("Geolocation error:", err);
                     container.innerHTML = `
                         <div class="text-center py-10 text-rose-400 text-xs">
-                            <i class="fa-solid fa-location-slash text-2xl mb-2 block text-slate-500"></i>
-                            <p class="font-bold">無法存取您的 GPS 位置</p>
-                            <p class="text-slate-400 mt-1">請在瀏覽器設定中開啟位置權限後重試</p>
+                            <i class="fa-solid fa-location-crosshairs text-2xl mb-2 block"></i>
+                            <p>無法存取您的 GPS 位置資訊</p>
+                            <p class="text-[10px] text-slate-500 mt-1">請於瀏覽器或系統設定中開啟權限</p>
                         </div>
                     `;
+                    isGpsSearching = false;
                 },
-                { timeout: 10000, enableHighAccuracy: true, maximumAge: 10000 }
+                { timeout: 10000, enableHighAccuracy: true, maximumAge: 30000 }
             );
         }
 
-        async function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest, orig) {
-            currentCompany = company;
-            selectedRoute = route;
-            selectedBound = {
-                bound: bound,
+        function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest, orig) {
+            currentActiveStop = {
+                company,
+                route,
+                bound,
                 serviceType: serviceType || '1',
-                orig: orig || '',
-                dest: dest || ''
+                stopId,
+                stopName,
+                seq,
+                dest,
+                orig,
+                totalStops: '--'
             };
 
-            currentActiveStop = {
-                company: company,
-                route: route,
-                bound: bound,
-                orig: orig || '',
-                dest: dest || '',
-                serviceType: serviceType || '1',
-                stopId: stopId,
-                stopName: stopName,
-                seq: seq,
-                totalStops: 0
-            };
+            currentCompany = company;
+            selectedRoute = route;
+            selectedBound = { bound, serviceType: serviceType || '1', orig, dest };
 
             closeGpsSearchModal();
             renderActiveStopDashboard();
             fetchRealTimeETA();
 
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(() => { fetchRealTimeETA(); }, 10000);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
 
             fetchStopsForSelectedRoute(true);
         }
 
-        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
-        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
-        function toggleApiKeyInput() {
-            const p = document.getElementById('apiKeyPanel');
-            p.classList.toggle('hidden');
+        function openAiModal() {
+            document.getElementById('aiAssistantModal').classList.remove('hidden');
         }
+
+        function closeAiModal() {
+            document.getElementById('aiAssistantModal').classList.add('hidden');
+        }
+
+        function toggleApiKeyInput() {
+            const panel = document.getElementById('apiKeyPanel');
+            panel.classList.toggle('hidden');
+        }
+
         function saveApiKey() {
             const val = document.getElementById('geminiApiKeyInput').value.trim();
             userApiKey = val;
             localStorage.setItem('gemini_custom_apikey', val);
-            toggleApiKeyInput();
+            alert(val ? "API Key 儲存成功！" : "API Key 已清除。");
+            document.getElementById('apiKeyPanel').classList.add('hidden');
         }
 
         async function sendAiMessage() {
             const input = document.getElementById('aiInput');
-            const chatBox = document.getElementById('aiChatBox');
             const text = input.value.trim();
             if (!text) return;
 
-            input.value = '';
+            const chatBox = document.getElementById('aiChatBox');
+            const sendBtn = document.getElementById('aiSendBtn');
+            const sendIcon = document.getElementById('aiSendIcon');
+
             chatBox.innerHTML += `
                 <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
                         ${text}
                     </div>
                 </div>
             `;
+
+            input.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            aiChatHistory.push({ role: "user", parts: [{ text: text }] });
+            sendBtn.disabled = true;
+            sendIcon.className = "fa-solid fa-spinner fa-spin";
 
-            const loadingId = 'ai-loading-' + Date.now();
+            const loadingMsgId = 'ai-loading-' + Date.now();
             chatBox.innerHTML += `
-                <div id="${loadingId}" class="flex items-center gap-2 text-xs text-slate-400 py-1">
-                    <i class="fa-solid fa-spinner fa-spin text-indigo-400"></i>
-                    <span>Gemini 正在思考中...</span>
+                <div id="${loadingMsgId}" class="flex justify-start">
+                    <div class="bg-slate-800 border border-slate-700 text-slate-300 rounded-2xl p-2.5 max-w-[85%] text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i>
+                        <span>Gemini 思考中...</span>
+                    </div>
                 </div>
             `;
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            const apiKeyToUse = userApiKey || "YOUR_GEMINI_API_KEY_FALLBACK";
-
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`, {
+                const apiKeyToUse = userApiKey;
+                if (!apiKeyToUse) {
+                    throw new Error("請先點擊右上角「金鑰」輸入 Gemini API Key");
+                }
+
+                aiChatHistory.push({ role: "user", parts: [{ text }] });
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKeyToUse}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [
-                            {
-                                role: "user",
-                                parts: [{ text: "你是香港巴士交通AI助手。請以繁體中文回答有關香港公共交通的問題。" }]
-                            },
-                            ...aiChatHistory
-                        ]
+                        contents: aiChatHistory,
+                        systemInstruction: {
+                            parts: [{ text: "你是一名精通香港交通（九巴、城巴、港鐵、專線小巴）的實時助手，請用親切簡潔的繁體中文（廣東話風格或香港中文）回答用戶的路線查詢、轉乘方案與過海建議。" }]
+                        }
                     })
                 });
 
-                const data = await response.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法回答該問題。";
+                const data = await res.json();
+                document.getElementById(loadingMsgId)?.remove();
 
-                document.getElementById(loadingId)?.remove();
+                if (data.error) {
+                    throw new Error(data.error.message || "API 呼叫失敗");
+                }
+
+                const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，未能獲取回應。";
+                aiChatHistory.push({ role: "model", parts: [{ text: replyText }] });
 
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
-                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
-                            ${reply.replace(/\n/g, '<br>')}
+                        <div class="bg-slate-800 border border-slate-700 text-slate-100 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
+                            ${replyText.replace(/\n/g, '<br>')}
                         </div>
                     </div>
                 `;
-                aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
-            } catch (e) {
-                document.getElementById(loadingId)?.remove();
+            } catch (err) {
+                document.getElementById(loadingMsgId)?.remove();
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
-                        <div class="bg-rose-900/60 border border-rose-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
-                            連線失敗，請檢查 API Key 或網路設定。
+                        <div class="bg-rose-950/80 border border-rose-800 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> ${err.message}
                         </div>
                     </div>
                 `;
+            } finally {
+                sendBtn.disabled = false;
+                sendIcon.className = "fa-solid fa-paper-plane";
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
