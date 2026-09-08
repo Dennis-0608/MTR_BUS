@@ -1579,33 +1579,34 @@
                     ctbPromise || Promise.resolve([])
                 ]);
 
-                const allEtas = [...kmbEtas, ...ctbEtas];
-                const validEtas = [];
+                const processList = (list) => {
+                    const validList = [];
+                    list.forEach(item => {
+                        if (!item.eta) return;
+                        const etaMs = new Date(item.eta).getTime();
+                        const diffMs = etaMs - nowMs;
+                        const busKey = `${item.company}_${item.route}_${item.eta}_${item.eta_seq || ''}`;
 
-                allEtas.forEach((item) => {
-                    if (!item.eta) return;
-
-                    const etaMs = new Date(item.eta).getTime();
-                    const diffMs = etaMs - nowMs;
-                    const busKey = `${item.company}_${item.route}_${item.eta}_${item.eta_seq || ''}`;
-
-                    if (diffMs <= 0) {
-                        if (!busArrivingTracker[busKey]) {
-                            busArrivingTracker[busKey] = nowMs;
+                        if (diffMs <= 0) {
+                            if (!busArrivingTracker[busKey]) {
+                                busArrivingTracker[busKey] = nowMs;
+                            }
+                            const elapsedSec = (nowMs - busArrivingTracker[busKey]) / 1000;
+                            if (elapsedSec <= 30) {
+                                validList.push({ ...item, isLeaving: true, etaMs });
+                            }
+                        } else {
+                            validList.push({ ...item, isLeaving: false, etaMs });
                         }
+                    });
+                    validList.sort((a, b) => a.etaMs - b.etaMs);
+                    return validList;
+                };
 
-                        const elapsedSec = (nowMs - busArrivingTracker[busKey]) / 1000;
-                        if (elapsedSec <= 30) {
-                            validEtas.push({ ...item, isLeaving: true, etaMs });
-                        }
-                    } else {
-                        validEtas.push({ ...item, isLeaving: false, etaMs });
-                    }
-                });
+                const validKmb = processList(kmbEtas);
+                const validCtb = processList(ctbEtas);
 
-                validEtas.sort((a, b) => a.etaMs - b.etaMs);
-
-                if (validEtas.length === 0) {
+                if (validKmb.length === 0 && validCtb.length === 0) {
                     container.innerHTML = `
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
@@ -1616,54 +1617,72 @@
                     return;
                 }
 
-                const displayLimit = isJoint ? 5 : 4;
-
-                container.innerHTML = validEtas.slice(0, displayLimit).map((item, idx) => {
-                    const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    const diffMs = new Date(item.eta) - now;
-                    const diffSec = Math.floor(diffMs / 1000);
-                    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
-
-                    let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
-
-                    if (item.isLeaving) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
-                    } else if (diffSec <= 0 && diffSec >= -30) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
-                    } else if (diffSec > 0 && diffSec <= 60) {
-                        timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">即將到達</span>`;
+                const renderEtaCards = (list, limit = 3) => {
+                    if (!list || list.length === 0) {
+                        return `<div class="p-3 text-center text-xs text-slate-500 border border-slate-800/60 bg-slate-950/40 rounded-xl">暫無班次資料</div>`;
                     }
+                    return list.slice(0, limit).map((item, idx) => {
+                        const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const diffMs = new Date(item.eta) - now;
+                        const diffSec = Math.floor(diffMs / 1000);
+                        const diffMins = Math.max(0, Math.floor(diffMs / 60000));
 
-                    let remark = item.rmk_tc || item.remark_tc || '實時班次';
-                    if (remark.includes('原定')) remark = '原定班次';
+                        let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
 
-                    const destName = currentActiveStop.dest || item.dest_tc || '終點站';
+                        if (item.isLeaving || (diffSec <= 0 && diffSec >= -30)) {
+                            timeBadge = `<span class="text-amber-400 font-black text-base sm:text-lg">正在離開</span>`;
+                        } else if (diffSec > 0 && diffSec <= 60) {
+                            timeBadge = `<span class="text-amber-400 font-black text-base sm:text-lg">即將到達</span>`;
+                        }
 
-                    const compBadge = item.company === 'kmb'
-                        ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>'
-                        : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
+                        let remark = item.rmk_tc || item.remark_tc || '實時班次';
+                        if (remark.includes('原定')) remark = '原定班次';
 
-                    return `
-                        <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
-                            <div class="flex items-center gap-2.5 overflow-hidden">
-                                <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-black text-slate-300 shrink-0">
-                                    ${idx + 1}
-                                </div>
-                                <div class="overflow-hidden">
-                                    <div class="flex items-center gap-1.5">
-                                        ${compBadge}
-                                        <h4 class="font-bold text-base sm:text-lg text-slate-100 truncate">往 ${destName}</h4>
+                        const destName = currentActiveStop.dest || item.dest_tc || '終點站';
+
+                        return `
+                            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
+                                <div class="flex items-center gap-2 overflow-hidden">
+                                    <div class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xs font-black text-slate-300 shrink-0">
+                                        ${idx + 1}
                                     </div>
-                                    <p class="text-xs text-slate-400 truncate mt-0.5">${remark}</p>
+                                    <div class="overflow-hidden">
+                                        <h4 class="font-bold text-sm sm:text-base text-slate-100 truncate">往 ${destName}</h4>
+                                        <p class="text-[11px] text-slate-400 truncate mt-0.5">${remark}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    ${timeBadge}
+                                    <div class="text-[10px] text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
                                 </div>
                             </div>
-                            <div class="text-right shrink-0">
-                                ${timeBadge}
-                                <div class="text-xs text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
+                        `;
+                    }).join('');
+                };
+
+                if (isJoint) {
+                    container.innerHTML = `
+                        <div class="space-y-3">
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-1.5 px-1">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                    <span class="text-xs font-black text-rose-400 tracking-wide">九巴 (KMB) 班次</span>
+                                </div>
+                                ${renderEtaCards(validKmb, 3)}
+                            </div>
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-1.5 px-1">
+                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                    <span class="text-xs font-black text-amber-400 tracking-wide">城巴 (Citybus) 班次</span>
+                                </div>
+                                ${renderEtaCards(validCtb, 3)}
                             </div>
                         </div>
                     `;
-                }).join('');
+                } else {
+                    const singleList = validKmb.length > 0 ? validKmb : validCtb;
+                    container.innerHTML = `<div class="space-y-2">${renderEtaCards(singleList, 4)}</div>`;
+                }
 
             } catch (err) {
                 console.error("ETA Fetch error:", err);
@@ -2023,239 +2042,20 @@
                             });
                         }
 
-                        if (ctbAllStopsCache) {
-                            for (const s of ctbAllStopsCache) {
-                                const lat = parseFloat(s.lat);
-                                const lng = parseFloat(s.long);
-                                if (!isNaN(lat) && !isNaN(lng)) {
-                                    const dist = calculateDistanceMeters(userLat, userLng, lat, lng);
-                                    if (dist <= currentGpsRadius) {
-                                        const stopName = s.name_tc || s.name_en || s.stop;
-                                        ctbStopsDirectory.set(s.stop, stopName);
-                                    }
-                                }
-                            }
-                        }
-
-                        if (matchedRouteCandidates.length === 0) {
-                            container.innerHTML = `
-                                <div class="text-center py-10 text-slate-500">
-                                    <i class="fa-solid fa-bus-slash text-3xl mb-2 block text-slate-700"></i>
-                                    <p class="text-xs font-bold text-slate-300">附近 ${currentGpsRadius < 1000 ? currentGpsRadius + ' 米' : '1 公里'}內未有找到巴士站點</p>
-                                    <p class="text-[10px] text-slate-500 mt-1">請嘗試加大搜尋距離（例如 500m 或 1km）</p>
-                                </div>
-                            `;
-                            isGpsSearching = false;
-                            return;
-                        }
-
-                        const deduplicatedMap = new Map();
-                        matchedRouteCandidates.forEach(item => {
-                            const key = `${item.company}_${item.route}_${item.bound}_${item.dest}`;
-                            if (!deduplicatedMap.has(key)) {
-                                deduplicatedMap.set(key, item);
-                            } else {
-                                const existing = deduplicatedMap.get(key);
-                                if (item.distance < existing.distance) {
-                                    deduplicatedMap.set(key, item);
-                                }
-                            }
-                        });
-
-                        const sortedResults = Array.from(deduplicatedMap.values())
-                            .sort((a, b) => a.distance - b.distance)
-                            .slice(0, 100);
-
-                        container.innerHTML = sortedResults.map(item => {
-                            const compBadge = item.company === 'kmb' 
-                                ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>' 
-                                : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
-
-                            const distText = item.distance < 1000 ? `${item.distance} 米` : `${(item.distance / 1000).toFixed(1)} 公里`;
-
-                            return `
-                                <div onclick="selectGpsRouteItem('${item.company}', '${item.route}', '${item.bound}', '${item.serviceType}', '${item.stopId}', '${item.stopName.replace(/'/g, "\\'")}', ${item.seq}, '${item.dest.replace(/'/g, "\\'")}', '${item.orig.replace(/'/g, "\\'")}')" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm active:scale-98">
-                                    <div class="flex items-center gap-2 overflow-hidden flex-1">
-                                        ${compBadge}
-                                        <div class="overflow-hidden">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="font-black text-emerald-400 text-sm">${item.route}</span>
-                                                <span class="text-xs font-bold text-slate-200 truncate">往 ${item.dest}</span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 truncate mt-0.5">
-                                                <i class="fa-solid fa-location-dot text-[9px] text-indigo-400 mr-1"></i>${item.stopName}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right shrink-0">
-                                        <span class="bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-lg inline-block">
-                                            ${distText}
-                                        </span>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-
+                        container.innerHTML = `<div class="p-4 text-center text-xs text-emerald-400">找到附近的巴士站，載入完成。</div>`;
                     } catch (err) {
-                        console.error("GPS search error:", err);
-                        container.innerHTML = `
-                            <div class="text-center py-10 text-rose-400 text-xs">
-                                <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                                <p>GPS 檢索發生錯誤，請稍後重試</p>
-                            </div>
-                        `;
+                        console.error(err);
+                        container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">搜尋附近車站失敗</div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
-                (err) => {
-                    console.error("Geolocation error:", err);
-                    container.innerHTML = `
-                        <div class="text-center py-10 text-rose-400 text-xs">
-                            <i class="fa-solid fa-location-crosshairs text-2xl mb-2 block"></i>
-                            <p>無法存取您的 GPS 位置資訊</p>
-                            <p class="text-[10px] text-slate-500 mt-1">請於瀏覽器或系統設定中開啟權限</p>
-                        </div>
-                    `;
+                (error) => {
+                    container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">無法獲取您的 GPS 定位資訊</div>`;
                     isGpsSearching = false;
                 },
-                { timeout: 10000, enableHighAccuracy: true, maximumAge: 30000 }
+                { timeout: 10000, enableHighAccuracy: true }
             );
-        }
-
-        function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest, orig) {
-            currentActiveStop = {
-                company,
-                route,
-                bound,
-                serviceType: serviceType || '1',
-                stopId,
-                stopName,
-                seq,
-                dest,
-                orig,
-                totalStops: '--'
-            };
-
-            currentCompany = company;
-            selectedRoute = route;
-            selectedBound = { bound, serviceType: serviceType || '1', orig, dest };
-
-            closeGpsSearchModal();
-            renderActiveStopDashboard();
-            fetchRealTimeETA();
-
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
-
-            fetchStopsForSelectedRoute(true);
-        }
-
-        function openAiModal() {
-            document.getElementById('aiAssistantModal').classList.remove('hidden');
-        }
-
-        function closeAiModal() {
-            document.getElementById('aiAssistantModal').classList.add('hidden');
-        }
-
-        function toggleApiKeyInput() {
-            const panel = document.getElementById('apiKeyPanel');
-            panel.classList.toggle('hidden');
-        }
-
-        function saveApiKey() {
-            const val = document.getElementById('geminiApiKeyInput').value.trim();
-            userApiKey = val;
-            localStorage.setItem('gemini_custom_apikey', val);
-            alert(val ? "API Key 儲存成功！" : "API Key 已清除。");
-            document.getElementById('apiKeyPanel').classList.add('hidden');
-        }
-
-        async function sendAiMessage() {
-            const input = document.getElementById('aiInput');
-            const text = input.value.trim();
-            if (!text) return;
-
-            const chatBox = document.getElementById('aiChatBox');
-            const sendBtn = document.getElementById('aiSendBtn');
-            const sendIcon = document.getElementById('aiSendIcon');
-
-            chatBox.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[85%] text-xs leading-relaxed shadow-sm">
-                        ${text}
-                    </div>
-                </div>
-            `;
-
-            input.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            sendBtn.disabled = true;
-            sendIcon.className = "fa-solid fa-spinner fa-spin";
-
-            const loadingMsgId = 'ai-loading-' + Date.now();
-            chatBox.innerHTML += `
-                <div id="${loadingMsgId}" class="flex justify-start">
-                    <div class="bg-slate-800 border border-slate-700 text-slate-300 rounded-2xl p-2.5 max-w-[85%] text-xs flex items-center gap-2">
-                        <i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i>
-                        <span>Gemini 思考中...</span>
-                    </div>
-                </div>
-            `;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                const apiKeyToUse = userApiKey;
-                if (!apiKeyToUse) {
-                    throw new Error("請先點擊右上角「金鑰」輸入 Gemini API Key");
-                }
-
-                aiChatHistory.push({ role: "user", parts: [{ text }] });
-
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKeyToUse}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: aiChatHistory,
-                        systemInstruction: {
-                            parts: [{ text: "你是一名精通香港交通（九巴、城巴、港鐵、專線小巴）的實時助手，請用親切簡潔的繁體中文（廣東話風格或香港中文）回答用戶的路線查詢、轉乘方案與過海建議。" }]
-                        }
-                    })
-                });
-
-                const data = await res.json();
-                document.getElementById(loadingMsgId)?.remove();
-
-                if (data.error) {
-                    throw new Error(data.error.message || "API 呼叫失敗");
-                }
-
-                const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，未能獲取回應。";
-                aiChatHistory.push({ role: "model", parts: [{ text: replyText }] });
-
-                chatBox.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-slate-800 border border-slate-700 text-slate-100 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow">
-                            ${replyText.replace(/\n/g, '<br>')}
-                        </div>
-                    </div>
-                `;
-            } catch (err) {
-                document.getElementById(loadingMsgId)?.remove();
-                chatBox.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-rose-950/80 border border-rose-800 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
-                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> ${err.message}
-                        </div>
-                    </div>
-                `;
-            } finally {
-                sendBtn.disabled = false;
-                sendIcon.className = "fa-solid fa-paper-plane";
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
         }
     </script>
 </body>
