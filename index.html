@@ -1075,6 +1075,36 @@
             await fetchStopsForSelectedRoute();
         }
 
+        // 統一獲取車站詳細資料（含快取與 GPS 座標）
+        async function getStopInfo(company, stopId) {
+            const directory = (company === 'kmb') ? kmbStopsDirectory : ctbStopsDirectory;
+            if (directory.has(stopId)) {
+                return directory.get(stopId);
+            }
+            try {
+                const url = (company === 'kmb')
+                    ? `https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopId}`
+                    : `https://rt.data.gov.hk/v2/transport/citybus/stop/${stopId}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.data) {
+                        const info = {
+                            name: data.data.name_tc || data.data.name_en || stopId,
+                            lat: parseFloat(data.data.lat || 0),
+                            long: parseFloat(data.data.long || 0)
+                        };
+                        directory.set(stopId, info);
+                        return info;
+                    }
+                }
+            } catch (e) {}
+
+            const fallback = { name: stopId, lat: 0, long: 0 };
+            directory.set(stopId, fallback);
+            return fallback;
+        }
+
         async function fetchStopsForSelectedRoute(quiet = false) {
             const stopSelect = document.getElementById('modalStopSelect');
             const stopListContainer = document.getElementById('modalStopList');
@@ -1114,33 +1144,8 @@
                 for (let i = 0; i < rawStops.length; i++) {
                     const st = rawStops[i];
                     const stopId = st.stop;
-                    let stopName = stopId;
-
-                    if (currentCompany === 'kmb') {
-                        if (!kmbStopsDirectory.has(stopId)) {
-                            try {
-                                const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopId}`);
-                                if (sRes.ok) {
-                                    const sData = await sRes.json();
-                                    if (sData && sData.data) kmbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
-                                }
-                            } catch (e) {}
-                        }
-                        stopName = kmbStopsDirectory.get(stopId) || stopId;
-                    } else {
-                        if (!ctbStopsDirectory.has(stopId)) {
-                            try {
-                                const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stopId}`);
-                                if (sRes.ok) {
-                                    const sData = await sRes.json();
-                                    if (sData && sData.data) ctbStopsDirectory.set(stopId, sData.data.name_tc || sData.data.name_en);
-                                }
-                            } catch (e) {}
-                        }
-                        stopName = ctbStopsDirectory.get(stopId) || stopId;
-                    }
-
-                    currentRouteStops.push({ seq: i + 1, stopId: stopId, name: stopName });
+                    const stopInfo = await getStopInfo(currentCompany, stopId);
+                    currentRouteStops.push({ seq: i + 1, stopId: stopId, name: stopInfo.name });
                 }
 
                 if (!quiet) {
@@ -1219,7 +1224,7 @@
         }
 
         /**
-         * 專家修復核心邏輯：合辦路線對齊技術 (Terminus & Name Similarity Matching)
+         * 專家級重構對齊邏輯：三層式合辦路線車站精準對齊 (GPS 物理距離 -> 核心站名匹配 -> 比例備用)
          */
         async function fetchCoCompanyData(route, bound, seq, currentComp) {
             const coComp = (currentComp === 'kmb') ? 'ctb' : 'kmb';
@@ -1251,25 +1256,8 @@
                 async function getTerminusName(stopsList) {
                     if (!stopsList || stopsList.length === 0) return '';
                     const lastStopId = stopsList[stopsList.length - 1].stop;
-                    if (coComp === 'kmb') {
-                        if (!kmbStopsDirectory.has(lastStopId)) {
-                            const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${lastStopId}`);
-                            if (sRes.ok) {
-                                const sData = await sRes.json();
-                                if (sData && sData.data) kmbStopsDirectory.set(lastStopId, sData.data.name_tc || sData.data.name_en);
-                            }
-                        }
-                        return kmbStopsDirectory.get(lastStopId) || '';
-                    } else {
-                        if (!ctbStopsDirectory.has(lastStopId)) {
-                            const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${lastStopId}`);
-                            if (sRes.ok) {
-                                const sData = await sRes.json();
-                                if (sData && sData.data) ctbStopsDirectory.set(lastStopId, sData.data.name_tc || sData.data.name_en);
-                            }
-                        }
-                        return ctbStopsDirectory.get(lastStopId) || '';
-                    }
+                    const info = await getStopInfo(coComp, lastStopId);
+                    return info.name || '';
                 }
 
                 const [outDestName, inDestName] = await Promise.all([
@@ -1304,49 +1292,63 @@
                     targetCoDir = 'inbound';
                 }
 
-                // 搜尋與當前車站名稱最相似的車站
-                const currentStopName = currentActiveStop ? currentActiveStop.stopName : '';
+                // 取得當前主車站與合辦公司所有對應方向車站的詳細資訊
+                const activeStopInfo = await getStopInfo(currentComp, currentActiveStop.stopId);
+                const coStopsInfoList = await Promise.all(
+                    targetCoStops.map(async (st, idx) => {
+                        const info = await getStopInfo(coComp, st.stop);
+                        return {
+                            seq: idx + 1,
+                            stopId: st.stop,
+                            name: info.name,
+                            lat: info.lat,
+                            long: info.long
+                        };
+                    })
+                );
+
                 let bestMatchedStop = null;
 
-                for (let i = 0; i < targetCoStops.length; i++) {
-                    const st = targetCoStops[i];
-                    const stId = st.stop;
-                    let stName = stId;
+                // 第一層：GPS 經緯度物理距離配對（最高精準度）
+                if (activeStopInfo.lat && activeStopInfo.long) {
+                    let minDistance = Infinity;
+                    let closestStop = null;
 
-                    if (coComp === 'kmb') {
-                        if (!kmbStopsDirectory.has(stId)) {
-                            const sRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stId}`);
-                            if (sRes.ok) {
-                                const sData = await sRes.json();
-                                if (sData && sData.data) kmbStopsDirectory.set(stId, sData.data.name_tc || sData.data.name_en);
+                    for (let st of coStopsInfoList) {
+                        if (st.lat && st.long) {
+                            const dist = calculateDistanceMeters(activeStopInfo.lat, activeStopInfo.long, st.lat, st.long);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                closestStop = st;
                             }
                         }
-                        stName = kmbStopsDirectory.get(stId) || stId;
-                    } else {
-                        if (!ctbStopsDirectory.has(stId)) {
-                            const sRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${stId}`);
-                            if (sRes.ok) {
-                                const sData = await sRes.json();
-                                if (sData && sData.data) ctbStopsDirectory.set(stId, sData.data.name_tc || sData.data.name_en);
-                            }
-                        }
-                        stName = ctbStopsDirectory.get(stId) || stId;
                     }
 
-                    if (currentStopName && stName && (currentStopName.includes(stName) || stName.includes(currentStopName))) {
-                        bestMatchedStop = { seq: i + 1, stopId: stId, name: stName };
-                        break;
+                    // 距離在 350 米以內即視為精確同站點配對
+                    if (closestStop && minDistance <= 350) {
+                        bestMatchedStop = closestStop;
                     }
                 }
 
-                // 備用方案：若站名完全無法配對，則採用相對比例索引
-                if (!bestMatchedStop && targetCoStops.length > 0) {
+                // 第二層：站名關鍵字模糊配對
+                if (!bestMatchedStop) {
+                    const cleanName = (str) => str.replace(/(轉車站|巴士總站|轉乘站|收費廣場|BBI|（.*）|\(.*\))/g, '').trim();
+                    const cleanedCurrent = cleanName(activeStopInfo.name || currentActiveStop.stopName || '');
+
+                    for (let st of coStopsInfoList) {
+                        const cleanedCo = cleanName(st.name);
+                        if (cleanedCurrent && cleanedCo && (cleanedCurrent.includes(cleanedCo) || cleanedCo.includes(cleanedCurrent))) {
+                            bestMatchedStop = st;
+                            break;
+                        }
+                    }
+                }
+
+                // 第三層保底：相對比例序列索引
+                if (!bestMatchedStop && coStopsInfoList.length > 0) {
                     const ratio = (seq - 1) / Math.max(1, (currentActiveStop.totalStops || 1) - 1);
-                    const targetIdx = Math.min(Math.round(ratio * (targetCoStops.length - 1)), targetCoStops.length - 1);
-                    const stObj = targetCoStops[targetIdx];
-                    const stId = stObj.stop;
-                    let stName = (coComp === 'kmb') ? kmbStopsDirectory.get(stId) : ctbStopsDirectory.get(stId);
-                    bestMatchedStop = { seq: targetIdx + 1, stopId: stId, name: stName || stId };
+                    const targetIdx = Math.min(Math.round(ratio * (coStopsInfoList.length - 1)), coStopsInfoList.length - 1);
+                    bestMatchedStop = coStopsInfoList[targetIdx];
                 }
 
                 if (!bestMatchedStop) return null;
@@ -1520,6 +1522,7 @@
                     }).join('');
                 }
 
+                // 修改重點 2：優化合辦路線資訊展示，刪除「合辦路線對應第X站」及「最近3班」字眼
                 if (isJoint && coCompanyResult) {
                     const coCompName = coCompanyResult.coComp === 'kmb' ? '九巴 (KMB)' : '城巴 (CTB)';
                     const badgeClass = coCompanyResult.coComp === 'kmb' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950';
@@ -1563,9 +1566,8 @@
                                 <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-800/80">
                                     <div class="flex items-center gap-1.5 overflow-hidden">
                                         <span class="${badgeClass} text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">${coCompName}</span>
-                                        <span class="text-xs font-bold text-indigo-300 truncate">合辦路線對應第 ${coCompanyResult.coSeq} 站：${coCompanyResult.coStopName}</span>
+                                        <span class="text-xs font-bold text-indigo-300 truncate">${coCompanyResult.coStopName}</span>
                                     </div>
-                                    <span class="text-[10px] text-slate-400 shrink-0">最近3班</span>
                                 </div>
                                 <div class="space-y-1">
                                     ${coEtaRows}
@@ -1871,44 +1873,123 @@
                                         serviceType: rs.service_type || '1',
                                         stopId: rs.stop,
                                         stopName: stopInfo.name,
-                                        seq: rs.seq,
-                                        dest: destName,
-                                        distance: stopInfo.distance
+                                        seq: parseInt(rs.seq),
+                                        distance: stopInfo.distance,
+                                        dest: destName
                                     });
                                 }
                             });
                         }
 
                         matchedCandidates.sort((a, b) => a.distance - b.distance);
-                        const topResults = matchedCandidates.slice(0, 30);
 
-                        if (topResults.length === 0) {
-                            container.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs"><p>附近 ${currentGpsRadius} 米內未有找到巴士站</p></div>`;
+                        if (matchedCandidates.length === 0) {
+                            container.innerHTML = `<div class="text-center py-10 text-amber-400 text-xs"><i class="fa-solid fa-circle-info text-2xl mb-2 block"></i><p>附近 ${currentGpsRadius} 米內找不到巴士路線</p></div>`;
                         } else {
-                            container.innerHTML = topResults.map(item => `
-                                <div onclick="loadFavoriteItem(${JSON.stringify(item).replace(/"/g, '&quot;')}); closeGpsSearchModal();" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between text-xs">
+                            container.innerHTML = matchedCandidates.slice(0, 30).map(c => `
+                                <div onclick="selectGpsRouteItem('${c.company}', '${c.route}', '${c.bound}', '${c.serviceType}', '${c.stopId}', '${c.stopName.replace(/'/g, "\\'")}', ${c.seq}, '${c.dest.replace(/'/g, "\\'")}')" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-2.5 rounded-xl cursor-pointer flex items-center justify-between transition">
                                     <div class="flex items-center gap-2 overflow-hidden">
-                                        <span class="bg-rose-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] shrink-0">九巴</span>
-                                        <span class="font-extrabold text-indigo-400 text-sm shrink-0">${item.route}</span>
-                                        <span class="text-slate-300 font-bold truncate">往 ${item.dest} (${item.stopName})</span>
+                                        <span class="bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>
+                                        <span class="font-extrabold text-indigo-400 text-sm shrink-0">${c.route}</span>
+                                        <div class="overflow-hidden">
+                                            <p class="text-xs font-bold text-slate-100 truncate">${c.stopName}</p>
+                                            <p class="text-[10px] text-slate-400 truncate">往 ${c.dest}</p>
+                                        </div>
                                     </div>
-                                    <span class="text-emerald-400 font-bold text-[10px] shrink-0 ml-1">${item.distance}m</span>
+                                    <span class="text-[10px] font-bold text-emerald-400 shrink-0 ml-2">${c.distance}m</span>
                                 </div>
                             `).join('');
                         }
+
                     } catch (err) {
-                        console.error("GPS Error:", err);
-                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>GPS 檢索失敗，請重試</p></div>`;
+                        console.error("GPS Search Error:", err);
+                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>GPS 搜尋失敗，請再試一次</p></div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
                 (err) => {
-                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取定位權限</p></div>`;
+                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取定位權限，請開啟裝置 GPS 權限</p></div>`;
                     isGpsSearching = false;
                 },
                 { timeout: 10000, enableHighAccuracy: true }
             );
+        }
+
+        function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest) {
+            closeGpsSearchModal();
+            currentCompany = company;
+            selectedRoute = route;
+            selectedBound = { bound, serviceType, orig: '', dest };
+
+            currentActiveStop = {
+                company,
+                route,
+                bound,
+                serviceType,
+                stopId,
+                stopName,
+                seq,
+                totalStops: seq,
+                dest
+            };
+
+            renderActiveStopDashboard();
+            fetchRealTimeETA();
+
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
+            fetchStopsForSelectedRoute(true);
+        }
+
+        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
+        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
+        function toggleApiKeyInput() { document.getElementById('apiKeyPanel').classList.toggle('hidden'); }
+        function saveApiKey() {
+            const key = document.getElementById('geminiApiKeyInput').value.trim();
+            userApiKey = key;
+            localStorage.setItem('gemini_custom_apikey', key);
+            alert('API Key 已成功儲存！');
+            document.getElementById('apiKeyPanel').classList.add('hidden');
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const chatBox = document.getElementById('aiChatBox');
+            chatBox.innerHTML += `<div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs ml-auto leading-relaxed shadow">${msg}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const loadingId = 'ai-loading-' + Date.now();
+            chatBox.innerHTML += `<div id="${loadingId}" class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-300 leading-relaxed"><i class="fa-solid fa-spinner fa-spin mr-1 text-indigo-400"></i>AI 正在思考中...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                if (!userApiKey) {
+                    document.getElementById(loadingId).innerHTML = `請先點擊右上角「金鑰」按鈕設定 Gemini API Key 後再試。`;
+                    return;
+                }
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: `你是一名香港本地交通專家。請簡短精準答覆用戶的問題：${msg}` }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，無法取得 AI 回應。";
+                document.getElementById(loadingId).innerHTML = aiReply.replace(/\n/g, '<br>');
+            } catch (err) {
+                document.getElementById(loadingId).innerHTML = "連線失敗，請檢查 API Key 或網路設定。";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
