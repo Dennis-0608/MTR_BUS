@@ -1584,38 +1584,21 @@
 
                     let coEtaRows = '';
                     if (coValidEtas.length === 0) {
-                        coEtaRows = `<p class="text-xs text-slate-500 text-center py-4">合辦公司暫無即時預報班次</p>`;
+                        coEtaRows = `<p class="text-xs text-slate-500 text-center py-2">合辦公司暫無即時預報班次</p>`;
                     } else {
                         coEtaRows = coValidEtas.slice(0, 3).map((item, idx) => {
                             const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
                             const diffMs = new Date(item.eta) - now;
-                            const diffSec = Math.floor(diffMs / 1000);
                             const diffMins = Math.max(0, Math.floor(diffMs / 60000));
-
-                            let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-amber-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
-                            if (diffSec <= 0 && diffSec >= -30) {
-                                timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">正在離開</span>`;
-                            } else if (diffSec > 0 && diffSec <= 60) {
-                                timeBadge = `<span class="text-amber-400 font-black text-lg sm:text-xl">即將到達</span>`;
-                            }
-
-                            let remark = item.rmk_tc || item.remark_tc || '實時班次';
-                            if (remark.includes('原定')) remark = '原定班次';
-
                             return `
-                                <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
-                                    <div class="flex items-center gap-2.5 overflow-hidden">
-                                        <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-black text-slate-300 shrink-0">
-                                            ${idx + 1}
-                                        </div>
-                                        <div class="overflow-hidden">
-                                            <h4 class="font-bold text-lg text-slate-100 truncate">往 ${currentActiveStop.dest || '目的車站'}</h4>
-                                            <p class="text-xs text-slate-400 truncate mt-0.5">${remark}</p>
-                                        </div>
+                                <div class="flex items-center justify-between py-1 border-b border-slate-800/50 last:border-0 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">${idx + 1}</span>
+                                        <span class="text-slate-300 font-semibold">往 ${currentActiveStop.dest || '目的車站'}</span>
                                     </div>
-                                    <div class="text-right shrink-0">
-                                        ${timeBadge}
-                                        <div class="text-xs text-slate-500 mt-0.5">預計 ${etaTimeStr}</div>
+                                    <div class="text-right">
+                                        <span class="font-extrabold text-amber-400 text-sm">${diffMins} 分鐘</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(${etaTimeStr})</span>
                                     </div>
                                 </div>
                             `;
@@ -1627,11 +1610,12 @@
                             <div class="bg-slate-950/80 border border-indigo-500/30 rounded-xl p-2.5 shadow-md">
                                 <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-800/80">
                                     <div class="flex items-center gap-1.5 overflow-hidden">
-                                        <span class="${badgeClass} text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">${coCompName}</span>
-                                        <span class="text-base font-bold text-indigo-300 truncate">${coCompanyResult.coStopName}</span>
+                                        <span class="${badgeClass} text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">${coCompName}</span>
+                                        <span class="text-xs font-bold text-indigo-300 truncate">合辦路線對應第 ${coCompanyResult.coSeq} 站：${coCompanyResult.coStopName}</span>
                                     </div>
+                                    <span class="text-[10px] text-slate-400 shrink-0">最近3班</span>
                                 </div>
-                                <div class="space-y-2">
+                                <div class="space-y-1">
                                     ${coEtaRows}
                                 </div>
                             </div>
@@ -1940,6 +1924,7 @@
                             }
                         }
 
+                        const matchedRouteCandidates = [];
                         const nearbyKmbStopsMap = new Map();
 
                         if (kmbAllStopsCache) {
@@ -1966,26 +1951,98 @@
                                     let boundVal = rs.bound;
                                     if (boundVal === 'O') boundVal = 'outbound';
                                     if (boundVal === 'I') boundVal = 'inbound';
+
+                                    const routeVariants = kmbRoutes.filter(r => String(r.route) === String(rs.route));
+                                    let destName = '目的車站';
+                                    let origName = '';
+                                    if (routeVariants.length > 0) {
+                                        const matchedVariant = routeVariants.find(v => {
+                                            let vBound = v.bound;
+                                            if (vBound === 'O') vBound = 'outbound';
+                                            if (vBound === 'I') vBound = 'inbound';
+                                            return (vBound === boundVal || !v.bound) && String(v.service_type || '1') === String(rs.service_type || '1');
+                                        }) || routeVariants[0];
+
+                                        destName = matchedVariant.dest_tc || matchedVariant.dest_en || '目的車站';
+                                        origName = matchedVariant.orig_tc || matchedVariant.orig_en || '';
+                                    }
+
+                                    matchedRouteCandidates.push({
+                                        company: 'kmb',
+                                        route: rs.route,
+                                        bound: boundVal,
+                                        serviceType: rs.service_type || '1',
+                                        stopId: rs.stop,
+                                        stopName: stopInfo.name,
+                                        seq: rs.seq,
+                                        dest: destName,
+                                        orig: origName,
+                                        distance: stopInfo.distance
+                                    });
                                 }
                             });
                         }
 
-                    } catch (e) {
-                        console.error(e);
+                        if (ctbAllStopsCache) {
+                            for (const s of ctbAllStopsCache) {
+                                const lat = parseFloat(s.lat);
+                                const lng = parseFloat(s.long);
+                                if (!isNaN(lat) && !isNaN(lng)) {
+                                    const dist = calculateDistanceMeters(userLat, userLng, lat, lng);
+                                    if (dist <= currentGpsRadius) {
+                                        const stopName = s.name_tc || s.name_en || s.stop;
+                                        ctbStopsDirectory.set(s.stop, stopName);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (matchedRouteCandidates.length === 0) {
+                            container.innerHTML = `
+                                <div class="text-center py-10 text-slate-500">
+                                    <i class="fa-solid fa-bus-slash text-3xl mb-2 block text-slate-700"></i>
+                                    <p class="text-xs font-bold text-slate-300">附近 ${currentGpsRadius < 1000 ? currentGpsRadius + ' 米' : '1 公里'}內未有找到巴士站點</p>
+                                    <p class="text-[10px] text-slate-500 mt-1">請嘗試加大搜尋距離（例如 500m 或 1km）</p>
+                                </div>
+                            `;
+                            isGpsSearching = false;
+                            return;
+                        }
+
+                        const deduplicatedMap = new Map();
+                        matchedRouteCandidates.forEach(item => {
+                            const key = `${item.company}_${item.route}_${item.bound}_${item.dest}`;
+                            if (!deduplicatedMap.has(key)) {
+                                deduplicatedMap.set(key, item);
+                            }
+                        });
+
+                        const sortedList = Array.from(deduplicatedMap.values()).sort((a, b) => a.distance - b.distance);
+
+                        container.innerHTML = sortedList.slice(0, 30).map(item => `
+                            <div onclick="selectStopAndClose('${item.stopId}', '${item.stopName.replace(/'/g, "\\'")}', ${item.seq})" class="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between gap-2 text-xs transition">
+                                <div class="flex items-center gap-2 overflow-hidden">
+                                    <span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">${item.route}</span>
+                                    <div class="overflow-hidden">
+                                        <div class="font-bold text-slate-100 truncate">${item.stopName} (第 ${item.seq} 站)</div>
+                                        <div class="text-[10px] text-slate-400 truncate">往 ${item.dest}</div>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] font-bold text-emerald-400 shrink-0">${item.distance}m</span>
+                            </div>
+                        `).join('');
+
+                    } catch (err) {
+                        console.error("GPS error:", err);
+                        container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">GPS 定位檢索失敗</div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
                 (err) => {
+                    container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">無法讀取 GPS 位置</div>`;
                     isGpsSearching = false;
-                    container.innerHTML = `
-                        <div class="text-center py-10 text-rose-400 text-xs">
-                            <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block"></i>
-                            <p>無法取得 GPS 位置，請檢查定位權限</p>
-                        </div>
-                    `;
-                },
-                { timeout: 10000, enableHighAccuracy: true }
+                }
             );
         }
     </script>
