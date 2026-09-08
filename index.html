@@ -218,7 +218,7 @@
         <!-- Favorites Footer Carousel Section -->
         <footer id="favoritesFooter" class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 shadow-lg shrink-0">
             <div class="flex items-center justify-between mb-1.5 px-0.5">
-                <!-- 需求 2 & 需求 3: 將標題文字改為 "收藏車站"，並將字體大小增加 4px (text-xs [12px] -> text-base [16px]) -->
+                <!-- 需求 2: 將標題字體大小增加 4px (由 text-xs 改為 text-base) -->
                 <h3 class="text-base font-bold text-slate-300 flex items-center gap-1.5">
                     <i class="fa-solid fa-star text-amber-400 text-xs"></i>
                     <span id="favFooterTitle">收藏車站</span>
@@ -1492,7 +1492,6 @@
                     `;
                 }).join('');
             } else {
-                // 需求 3: 切換為 MTR 模式時，標題保持為 "收藏車站" (而非原先的 "我的 MTR 收藏車站")
                 title.textContent = "收藏車站";
                 if (!mtrFavorites || mtrFavorites.length === 0) {
                     section.innerHTML = `<div class="text-slate-500 text-xs py-1 px-1">未有 MTR 收藏，選擇鐵路站時點擊「收藏」即可儲存</div>`;
@@ -1987,26 +1986,32 @@
                 }
 
                 const data = await response.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "對不起，未能取得 AI 回應。";
-                
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法解答此問題。";
+
                 aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
 
                 aiChatBox.innerHTML += `
-                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
-                        ${reply.replace(/\n/g, '<br>')}
+                    <div class="flex justify-start">
+                        <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                            ${reply.replace(/\n/g, '<br>')}
+                        </div>
                     </div>
                 `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
             } catch (err) {
-                if (document.getElementById(loadingId)) {
-                    document.getElementById(loadingId).remove();
-                }
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+
                 aiChatBox.innerHTML += `
-                    <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300">
-                        連線失敗：${err.message}
+                    <div class="flex justify-start">
+                        <div class="bg-rose-950/80 border border-rose-800 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                            ⚠️ 連線失敗：請確保你已設定有效的 Gemini API Key。
+                        </div>
                     </div>
                 `;
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
