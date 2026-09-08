@@ -215,7 +215,7 @@
 
         </main>
 
-        <!-- Favorites Footer Carousel Section -->
+        <!-- Favorites Footer Section (Removed Sidebars) -->
         <footer id="favoritesFooter" class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 shadow-lg shrink-0">
             <div class="flex items-center justify-between mb-1.5 px-0.5">
                 <h3 class="text-base font-bold text-slate-300 flex items-center gap-1.5">
@@ -224,20 +224,12 @@
                 </h3>
             </div>
             
-            <div class="relative flex items-center group">
-                <button onclick="scrollFavorites('left')" class="absolute left-0 z-10 w-6 h-full bg-slate-950/80 hover:bg-slate-950 text-slate-300 rounded-l-xl flex items-center justify-center transition border-r border-slate-800 shadow-md">
-                    <i class="fa-solid fa-chevron-left text-[10px]"></i>
-                </button>
-                
-                <div id="favoritesSection" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth w-full px-7">
+            <div class="flex items-center">
+                <div id="favoritesSection" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth w-full">
                     <div class="text-slate-500 text-xs py-1 px-1">
                         未有 MTR 收藏，選擇鐵路站時點擊「收藏」即可儲存
                     </div>
                 </div>
-
-                <button onclick="scrollFavorites('right')" class="absolute right-0 z-10 w-6 h-full bg-slate-950/80 hover:bg-slate-950 text-slate-300 rounded-r-xl flex items-center justify-center transition border-l border-slate-800 shadow-md">
-                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                </button>
             </div>
         </footer>
 
@@ -751,7 +743,7 @@
 
                         let takeCount = 2;
 
-                        // 需求 1 修改: 康城站 (LHP) 往北角/調景嶺方向 (UP 方向) 顯示班次改為 4 班
+                        // 修復：康城站 (LHP) 往調景嶺/北角方向 (UP) 設為最高優先級，確保顯示 4 個班次
                         if (lineCode === 'TKL' && selectedMtrStation === 'LHP' && dir === 'UP') {
                             takeCount = 4;
                         } else {
@@ -860,7 +852,7 @@
             }
         }
 
-        // 需求 2 修改: 將收藏車站的數量上限控制為最多 3 個，超過彈出警告
+        // 修改：警示標語簡化為「收藏車站已達上限 (最多 3 個)！」
         function toggleMtrFavorite() {
             if (!selectedMtrStation) return;
             const lineToSave = selectedMtrLine || (stationToLinesMap.get(selectedMtrStation) || [])[0] || '';
@@ -869,7 +861,7 @@
 
             if (index < 0) {
                 if (mtrFavorites.length >= 3) {
-                    alert("收藏車站數量已達上限 (最多 3 個)！請先刪除現有收藏再新增。");
+                    alert("收藏車站已達上限 (最多 3 個)！");
                     return;
                 }
                 mtrFavorites.push(item);
@@ -1472,7 +1464,6 @@
             }
         }
 
-        // 需求 3 修改: 收藏車站的字體增加 2px (由 text-xs 改為 text-sm，提升閱讀性)
         function renderFavorites() {
             const section = document.getElementById('favoritesSection');
             const title = document.getElementById('favFooterTitle');
@@ -1512,16 +1503,6 @@
                         </div>
                     `;
                 }).join('');
-            }
-        }
-
-        function scrollFavorites(direction) {
-            const container = document.getElementById('favoritesSection');
-            const scrollAmount = 150;
-            if (direction === 'left') {
-                container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
-            } else {
-                container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
             }
         }
 
@@ -1984,39 +1965,30 @@
                     })
                 });
 
-                document.getElementById(loadingId).remove();
-
-                if (!response.ok) {
-                    throw new Error("AI API 回應錯誤，請檢查 API Key");
-                }
-
                 const data = await response.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法解答此問題。";
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我暫時無法回答該問題。";
 
-                aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
+                document.getElementById(loadingId)?.remove();
 
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
-                        <div class="bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
                             ${reply.replace(/\n/g, '<br>')}
                         </div>
                     </div>
                 `;
-                chatBox.scrollTop = chatBox.scrollHeight;
-
-            } catch (err) {
-                if (document.getElementById(loadingId)) {
-                    document.getElementById(loadingId).remove();
-                }
+                aiChatHistory.push({ role: "model", parts: [{ text: reply }] });
+            } catch (e) {
+                document.getElementById(loadingId)?.remove();
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
-                        <div class="bg-rose-950/80 border border-rose-800 text-rose-200 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                            ⚠️ 服務暫時無法連線，請檢查 API Key 設定或網路連線。
+                        <div class="bg-rose-900/60 border border-rose-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
+                            連線失敗，請檢查 API Key 或網路設定。
                         </div>
                     </div>
                 `;
-                chatBox.scrollTop = chatBox.scrollHeight;
             }
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
