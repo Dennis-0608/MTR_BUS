@@ -77,11 +77,11 @@
                     </button>
                 </div>
 
-                <!-- Live Weather & District Badge -->
-                <div id="weather-box" onclick="fetchWeatherAndLocation()" class="flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl text-base gap-1.5 shrink-0 cursor-pointer hover:border-slate-700 transition">
+                <!-- Live Weather & District Badge (已將字體大小與字重完全統一) -->
+                <div id="weather-box" onclick="fetchWeatherAndLocation()" class="flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl gap-1.5 shrink-0 cursor-pointer hover:border-slate-700 transition">
                     <span id="weatherIcon" class="text-xl">⛅</span>
-                    <span id="weatherTemp" class="font-extrabold text-emerald-400 text-base sm:text-lg">--°C</span>
-                    <span id="weatherLocation" class="text-slate-300 text-base">香港</span>
+                    <span id="weatherTemp" class="font-black text-emerald-400 text-base sm:text-lg">--°C</span>
+                    <span id="weatherLocation" class="font-black text-slate-100 text-base sm:text-lg">香港</span>
                     <i class="fa-solid fa-location-dot text-xs text-indigo-400" id="gpsStatusIcon"></i>
                 </div>
 
@@ -493,16 +493,26 @@
         let selectedMtrStation = '';
         let selectedMtrFilterLine = 'ALL';
 
+        // 全港 18 區主要測量站座標及 HKO 對應名稱清單
         const hkDistricts = [
-            { name: '尖沙咀', hkoName: '香港天文台', lat: 22.3019, lng: 114.1742 },
-            { name: '中環', hkoName: '香港公園', lat: 22.2780, lng: 114.1580 },
-            { name: '觀塘', hkoName: '觀塘', lat: 22.3117, lng: 114.2258 },
-            { name: '沙田', hkoName: '沙田', lat: 22.3833, lng: 114.1833 },
-            { name: '屯門', hkoName: '屯門', lat: 22.3917, lng: 113.9714 },
-            { name: '元朗', hkoName: '濕地公園', lat: 22.4600, lng: 114.0000 },
-            { name: '荃灣', hkoName: '荃灣城門谷', lat: 22.3733, lng: 114.1167 },
-            { name: '黃大仙', hkoName: '黃大仙', lat: 22.3350, lng: 114.1917 },
-            { name: '深水埗', hkoName: '深水埗', lat: 22.3300, lng: 114.1600 }
+            { name: '油尖旺', hkoName: '京士柏', altNames: ['香港天文台', '九龍'], lat: 22.3019, lng: 114.1742 },
+            { name: '中西區', hkoName: '香港公園', altNames: ['中環', '金鐘'], lat: 22.2780, lng: 114.1580 },
+            { name: '灣仔', hkoName: '跑馬地', altNames: ['灣仔', '銅鑼灣'], lat: 22.2706, lng: 114.1836 },
+            { name: '南區', hkoName: '黃竹坑', altNames: ['赤柱', '香港仔'], lat: 22.2478, lng: 114.1736 },
+            { name: '東區', hkoName: '鰂魚涌', altNames: ['北角', '太古'], lat: 22.2886, lng: 114.2108 },
+            { name: '九龍城', hkoName: '九龍城', altNames: ['啟德', '土瓜灣'], lat: 22.3214, lng: 114.1983 },
+            { name: '觀塘', hkoName: '觀塘', altNames: ['九龍灣', '藍田'], lat: 22.3117, lng: 114.2258 },
+            { name: '黃大仙', hkoName: '黃大仙', altNames: ['鑽石山', '慈雲山'], lat: 22.3350, lng: 114.1917 },
+            { name: '深水埗', hkoName: '深水埗', altNames: ['長沙灣', '荔枝角'], lat: 22.3300, lng: 114.1600 },
+            { name: '葵青', hkoName: '葵涌', altNames: ['青衣', '葵芳'], lat: 22.3578, lng: 114.1064 },
+            { name: '荃灣', hkoName: '荃灣城門谷', altNames: ['荃灣'], lat: 22.3733, lng: 114.1167 },
+            { name: '屯門', hkoName: '屯門', altNames: ['屯門市中心'], lat: 22.3917, lng: 113.9714 },
+            { name: '元朗', hkoName: '元朗市中心', altNames: ['濕地公園', '天水圍', '流浮山'], lat: 22.4445, lng: 114.0222 },
+            { name: '北區', hkoName: '上水', altNames: ['粉嶺', '打鼓嶺'], lat: 22.5019, lng: 114.1283 },
+            { name: '大埔', hkoName: '大埔', altNames: ['太和'], lat: 22.4508, lng: 114.1642 },
+            { name: '沙田', hkoName: '沙田', altNames: ['馬鞍山', '火炭'], lat: 22.3833, lng: 114.1833 },
+            { name: '西貢', hkoName: '將軍澳', altNames: ['西貢', '康城'], lat: 22.3158, lng: 114.2628 },
+            { name: '離島', hkoName: '赤鱲角', altNames: ['東涌', '機場', '長洲', '坪洲'], lat: 22.3094, lng: 113.9219 }
         ];
 
         window.onload = async function() {
@@ -800,7 +810,7 @@
                                 </div>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="font-black text-lg ${isSpecialState ? 'text-amber-400' : 'text-emerald-400'}">
+                                <span class="font-black text-2xl sm:text-3xl ${isSpecialState ? 'text-amber-400' : 'text-emerald-400'}">
                                     ${statusText}
                                 </span>
                             </div>
@@ -862,6 +872,7 @@
             }
         }
 
+        // 參照 data.gov.hk 香港天文台 (HKO) 1分鐘平均氣溫開放數據及 GPS 比對
         async function fetchWeatherAndLocation() {
             const gpsIcon = document.getElementById('gpsStatusIcon');
             const locEl = document.getElementById('weatherLocation');
@@ -878,9 +889,10 @@
                     });
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
+                    
                     let minDist = Infinity;
                     hkDistricts.forEach(d => {
-                        const dist = Math.sqrt(Math.pow(d.lat - lat, 2) + Math.pow(d.lng - lng, 2));
+                        const dist = calculateDistanceMeters(lat, lng, d.lat, d.lng);
                         if (dist < minDist) {
                             minDist = dist;
                             userDistrict = d;
@@ -901,7 +913,11 @@
                     let matchedTemp = null;
 
                     if (userDistrict) {
-                        const targetItem = tempArr.find(t => t.place === userDistrict.hkoName || t.place.includes(userDistrict.name));
+                        const targetItem = tempArr.find(t => 
+                            t.place === userDistrict.hkoName || 
+                            t.place.includes(userDistrict.name) ||
+                            (userDistrict.altNames && userDistrict.altNames.some(alt => t.place.includes(alt)))
+                        );
                         if (targetItem) {
                             matchedTemp = targetItem.value;
                             locEl.textContent = userDistrict.name;
@@ -909,7 +925,7 @@
                     }
 
                     if (matchedTemp === null) {
-                        const hkoItem = tempArr.find(t => t.place === '香港天文台') || tempArr[0];
+                        const hkoItem = tempArr.find(t => t.place === '京士柏' || t.place === '香港天文台') || tempArr[0];
                         matchedTemp = hkoItem ? hkoItem.value : 28;
                         if (!userDistrict) locEl.textContent = "香港";
                     }
@@ -1458,7 +1474,6 @@
                     const diffMs = etaMs - nowMs;
                     const diffSec = Math.floor(diffMs / 1000);
 
-                    // 超過 30 秒 (diffSec < -30) 自動剔除，由下一班資訊取代
                     if (diffSec >= -30) {
                         validEtas.push({ ...item, diffSec, diffMs });
                     }
@@ -1484,10 +1499,8 @@
                         let timeBadge = `<span class="text-2xl sm:text-3xl font-black text-emerald-400">${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span></span>`;
                         
                         if (diffSec <= 0 && diffSec >= -30) {
-                            // 到達後至 30 秒：顯示「正在離開」
                             timeBadge = `<span class="text-2xl sm:text-3xl font-black text-amber-400">正在離開</span>`;
                         } else if (diffSec > 0 && diffSec <= 60) {
-                            // 最後 1 分鐘 (1-60 秒)：顯示「即將到達」
                             timeBadge = `<span class="text-2xl sm:text-3xl font-black text-amber-400">即將到達</span>`;
                         }
 
@@ -1540,22 +1553,23 @@
                             const diffSec = item.diffSec;
                             const diffMins = Math.max(0, Math.floor(item.diffMs / 60000));
 
-                            let statusBadge = `<span class="font-extrabold text-amber-400 text-sm">${diffMins} 分鐘</span>`;
+                            // 合辦公司時間字體大小亦統一為全站標準高顯眼字體
+                            let statusBadge = `<span class="font-black text-2xl sm:text-3xl text-amber-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
                             if (diffSec <= 0 && diffSec >= -30) {
-                                statusBadge = `<span class="font-extrabold text-amber-400 text-sm">正在離開</span>`;
+                                statusBadge = `<span class="font-black text-2xl sm:text-3xl text-amber-400">正在離開</span>`;
                             } else if (diffSec > 0 && diffSec <= 60) {
-                                statusBadge = `<span class="font-extrabold text-amber-400 text-sm">即將到達</span>`;
+                                statusBadge = `<span class="font-black text-2xl sm:text-3xl text-amber-400">即將到達</span>`;
                             }
 
                             return `
-                                <div class="flex items-center justify-between py-1 border-b border-slate-800/50 last:border-0 text-xs">
+                                <div class="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0 text-xs">
                                     <div class="flex items-center gap-2">
                                         <span class="w-5 h-5 rounded bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">${idx + 1}</span>
                                         <span class="text-slate-300 font-semibold">往 ${currentActiveStop.dest || '目的車站'}</span>
                                     </div>
                                     <div class="text-right">
                                         ${statusBadge}
-                                        <span class="text-[10px] text-slate-500 ml-1">(${etaTimeStr})</span>
+                                        <div class="text-[10px] text-slate-500">預計 ${etaTimeStr}</div>
                                     </div>
                                 </div>
                             `;
@@ -1900,71 +1914,68 @@
                                 if (stopInfo && stopInfo.lat && stopInfo.long) {
                                     const dist = calculateDistanceMeters(userLat, userLng, stopInfo.lat, stopInfo.long);
                                     if (dist <= currentGpsRadius) {
-                                        let boundVal = (rs.dir === 'O' || rs.dir === 'outbound') ? 'outbound' : 'inbound';
+                                        let boundVal = (rs.dir === 'O') ? 'outbound' : ((rs.dir === 'I') ? 'inbound' : rs.dir);
                                         const routeVariants = ctbRoutes.filter(r => String(r.route) === String(rs.route));
                                         let destName = '目的車站';
                                         if (routeVariants.length > 0) {
                                             const matched = routeVariants[0];
-                                            destName = (boundVal === 'outbound') ? (matched.dest_tc || matched.dest_en || destName) : (matched.orig_tc || matched.orig_en || destName);
+                                            destName = (boundVal === 'outbound') ? (matched.dest_tc || matched.dest_en) : (matched.orig_tc || matched.orig_en);
                                         }
                                         matchedCandidates.push({
                                             company: 'ctb',
                                             route: rs.route,
-                                            bound: boundVal,
+                                            bound: boundVal || 'outbound',
                                             serviceType: '1',
                                             stopId: rs.stop,
                                             stopName: stopInfo.name,
-                                            seq: parseInt(rs.seq || '1'),
+                                            seq: parseInt(rs.seq || 1),
                                             distance: dist,
-                                            dest: destName
+                                            dest: destName || '目的車站'
                                         });
                                     }
                                 }
                             });
                         }
 
-                        matchedCandidates.sort((a, b) => a.distance - b.distance);
-
-                        const uniqueCandidates = [];
-                        const seenKeys = new Set();
-                        matchedCandidates.forEach(item => {
-                            const key = `${item.company}_${item.route}_${item.bound}_${item.stopId}`;
-                            if (!seenKeys.has(key)) {
-                                seenKeys.add(key);
-                                uniqueCandidates.push(item);
-                            }
-                        });
-
-                        if (uniqueCandidates.length === 0) {
-                            container.innerHTML = `
-                                <div class="text-center py-10 text-slate-400 text-xs">
-                                    <i class="fa-solid fa-circle-info text-2xl mb-2 text-indigo-400 block"></i>
-                                    <p>附近 ${currentGpsRadius < 1000 ? currentGpsRadius + ' 米' : '1 公里'}內未有找到巴士路線站點</p>
-                                    <p class="text-[10px] text-slate-500 mt-1">嘗試加大搜尋距離</p>
-                                </div>
-                            `;
+                        if (matchedCandidates.length === 0) {
+                            container.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs"><p>附近 ${currentGpsRadius} 米內未有找到巴士站點</p></div>`;
+                            isGpsSearching = false;
                             return;
                         }
 
-                        container.innerHTML = uniqueCandidates.slice(0, 30).map(item => {
+                        matchedCandidates.sort((a, b) => a.distance - b.distance);
+
+                        const uniqueMap = new Map();
+                        matchedCandidates.forEach(item => {
+                            const key = `${item.company}-${item.route}-${item.stopId}`;
+                            if (!uniqueMap.has(key)) {
+                                uniqueMap.set(key, item);
+                            }
+                        });
+
+                        const finalResults = Array.from(uniqueMap.values()).slice(0, 30);
+
+                        container.innerHTML = finalResults.map((item) => {
                             const compBadge = item.company === 'kmb' 
-                                ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>' 
-                                : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">城巴</span>';
-                            
+                                ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">九巴</span>' 
+                                : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded">城巴</span>';
+
+                            const itemJson = JSON.stringify(item).replace(/"/g, '&quot;');
+
                             return `
-                                <div onclick="selectGpsResult('${item.company}', '${item.route}', '${item.bound}', '${item.serviceType}', '${item.stopId}', '${item.stopName.replace(/'/g, "\\'")}', ${item.seq}, '${item.dest.replace(/'/g, "\\'")}')" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm">
+                                <div onclick="selectGpsResult(${itemJson})" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl p-2.5 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm">
                                     <div class="flex items-center gap-2 overflow-hidden">
-                                        ${compBadge}
+                                        <div class="flex flex-col items-center justify-center bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 shrink-0 min-w-[50px]">
+                                            ${compBadge}
+                                            <span class="font-black text-sm text-white mt-0.5">${item.route}</span>
+                                        </div>
                                         <div class="overflow-hidden">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="font-extrabold text-sm text-indigo-400">${item.route}</span>
-                                                <span class="text-xs text-slate-200 font-bold truncate">往 ${item.dest}</span>
-                                            </div>
-                                            <div class="text-[11px] text-slate-400 truncate mt-0.5">${item.seq}. ${item.stopName}</div>
+                                            <h4 class="font-bold text-xs text-slate-100 truncate">${item.stopName}</h4>
+                                            <p class="text-[10px] text-indigo-400 truncate mt-0.5">往 ${item.dest}</p>
                                         </div>
                                     </div>
                                     <div class="text-right shrink-0">
-                                        <span class="text-xs font-bold text-emerald-400">${item.distance}m</span>
+                                        <span class="text-xs font-extrabold text-emerald-400">${item.distance}m</span>
                                         <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 ml-1"></i>
                                     </div>
                                 </div>
@@ -1972,45 +1983,110 @@
                         }).join('');
 
                     } catch (err) {
-                        console.error("GPS search error:", err);
-                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>定位或資料載入失敗，請稍後重試</p></div>`;
+                        console.error("GPS Search error:", err);
+                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>GPS 搜尋失敗，請再試一次</p></div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
                 (err) => {
+                    console.error("Geolocation error:", err);
+                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取 GPS 定位，請確保已開啟定位權限</p></div>`;
                     isGpsSearching = false;
-                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取您的 GPS 定位，請確保權限已開啟</p></div>`;
                 },
-                { timeout: 10000, enableHighAccuracy: true }
+                { timeout: 10000, maximumAge: 10000, enableHighAccuracy: true }
             );
         }
 
-        function selectGpsResult(company, route, bound, serviceType, stopId, stopName, seq, dest) {
-            currentCompany = company;
-            selectedRoute = route;
-            selectedBound = { bound, serviceType, orig: '', dest };
-            
-            currentActiveStop = {
-                company,
-                route,
-                bound,
-                orig: '',
-                dest,
-                serviceType,
-                stopId,
-                stopName,
-                seq,
-                totalStops: seq
-            };
-
+        function selectGpsResult(item) {
             closeGpsSearchModal();
-            renderActiveStopDashboard();
-            fetchRealTimeETA();
+            loadFavoriteItem(item);
+        }
 
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
-            fetchStopsForSelectedRoute(true);
+        function openAiModal() {
+            document.getElementById('aiAssistantModal').classList.remove('hidden');
+        }
+
+        function closeAiModal() {
+            document.getElementById('aiAssistantModal').classList.add('hidden');
+        }
+
+        function toggleApiKeyInput() {
+            const panel = document.getElementById('apiKeyPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function saveApiKey() {
+            const val = document.getElementById('geminiApiKeyInput').value.trim();
+            userApiKey = val;
+            localStorage.setItem('gemini_custom_apikey', val);
+            alert("Gemini API Key 已儲存！");
+            document.getElementById('apiKeyPanel').classList.add('hidden');
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const chatBox = document.getElementById('aiChatBox');
+            chatBox.innerHTML += `
+                <div class="flex justify-end">
+                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow-sm">
+                        ${text}
+                    </div>
+                </div>
+            `;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (!userApiKey) {
+                chatBox.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300 leading-relaxed">
+                        ⚠️ 請先點擊右上角「金鑰」按鈕設定您的 Gemini API Key 才能開啟 AI 智能問答功能。
+                    </div>
+                `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+                return;
+            }
+
+            const sendBtnIcon = document.getElementById('aiSendIcon');
+            if (sendBtnIcon) sendBtnIcon.className = "fa-solid fa-spinner fa-spin";
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `你是一名香港交通專家。請簡明回答以下關於香港巴士或鐵路的查詢：${text}` }] }]
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，無法回應。";
+                    chatBox.innerHTML += `
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
+                            ${reply.replace(/\n/g, '<br>')}
+                        </div>
+                    `;
+                } else {
+                    chatBox.innerHTML += `
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300 leading-relaxed">
+                            請求失敗，請檢查 API Key 是否正確。
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                chatBox.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300 leading-relaxed">
+                        連線發生錯誤，請稍後再試。
+                    </div>
+                `;
+            } finally {
+                if (sendBtnIcon) sendBtnIcon.className = "fa-solid fa-paper-plane";
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
         }
     </script>
 </body>
