@@ -258,7 +258,7 @@
                 <div class="relative">
                     <label class="block text-xs font-semibold text-slate-300 mb-1">選擇或輸入路線號碼：</label>
                     <div class="relative">
-                        <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, A11)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-indigo-500 text-sm" />
+                        <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, 101)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-indigo-500 text-sm" />
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
                     </div>
                     <div id="routeAutocompleteDropdown" class="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-56 overflow-y-auto shadow-2xl z-50 hidden"></div>
@@ -474,7 +474,6 @@
         let favorites = JSON.parse(localStorage.getItem('hk_bus_favs') || '[]');
         let mtrFavorites = JSON.parse(localStorage.getItem('hk_mtr_favs') || '[]');
         let userApiKey = localStorage.getItem('gemini_custom_apikey') || '';
-        let aiChatHistory = [];
 
         let currentGpsRadius = 500;
         let kmbAllStopsCache = null;
@@ -1021,28 +1020,56 @@
             if (stopList) stopList.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">請先選擇路線與方向</p>';
         }
 
-        function loadBoundOptions(routeNum) {
+        async function loadBoundOptions(routeNum) {
             clearAllStopData();
             const boundSelect = document.getElementById('modalBoundSelect');
-            const routeVariants = routeMap.get(routeNum) || [];
-
-            if (routeVariants.length === 0) {
-                boundSelect.innerHTML = '<option value="">-- 無效路線 --</option>';
-                return;
-            }
-
-            let optionsHtml = '<option value="">-- 請選擇行車方向 --</option>';
+            boundSelect.innerHTML = '<option value="">-- 正在載入行車方向... --</option>';
 
             if (currentCompany === 'ctb') {
-                routeVariants.forEach((v) => {
-                    const orig = v.orig_tc || v.orig_en || '起點';
-                    const dest = v.dest_tc || v.dest_en || '終點';
-                    optionsHtml += `<option value="outbound" data-service="1" data-orig="${orig}" data-dest="${dest}">往 ${dest} (由 ${orig} 開出)</option>`;
-                    if (orig !== dest) {
-                        optionsHtml += `<option value="inbound" data-service="1" data-orig="${dest}" data-dest="${orig}">往 ${orig} (由 ${dest} 開出)</option>`;
+                try {
+                    const [resOut, resIn] = await Promise.all([
+                        fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${routeNum}/outbound`),
+                        fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${routeNum}/inbound`)
+                    ]);
+
+                    let outStops = resOut.ok ? (await resOut.json()).data || [] : [];
+                    let inStops = resIn.ok ? (await resIn.json()).data || [] : [];
+
+                    outStops.sort((a, b) => parseInt(a.seq) - parseInt(b.seq));
+                    inStops.sort((a, b) => parseInt(a.seq) - parseInt(b.seq));
+
+                    let optionsHtml = '<option value="">-- 請選擇行車方向 --</option>';
+
+                    if (outStops.length > 0) {
+                        const firstStop = await getStopInfo('ctb', outStops[0].stop);
+                        const lastStop = await getStopInfo('ctb', outStops[outStops.length - 1].stop);
+                        optionsHtml += `<option value="outbound" data-service="1" data-orig="${firstStop.name}" data-dest="${lastStop.name}">往 ${lastStop.name} (由 ${firstStop.name} 開出)</option>`;
                     }
-                });
+
+                    if (inStops.length > 0) {
+                        const firstStop = await getStopInfo('ctb', inStops[0].stop);
+                        const lastStop = await getStopInfo('ctb', inStops[inStops.length - 1].stop);
+                        optionsHtml += `<option value="inbound" data-service="1" data-orig="${firstStop.name}" data-dest="${lastStop.name}">往 ${lastStop.name} (由 ${firstStop.name} 開出)</option>`;
+                    }
+
+                    if (outStops.length === 0 && inStops.length === 0) {
+                        boundSelect.innerHTML = '<option value="">-- 暫無此路線方向資料 --</option>';
+                        return;
+                    }
+
+                    boundSelect.innerHTML = optionsHtml;
+                } catch (err) {
+                    console.error("CTB bound loading error:", err);
+                    boundSelect.innerHTML = '<option value="">-- 載入方向失敗 --</option>';
+                }
             } else {
+                const routeVariants = routeMap.get(routeNum) || [];
+                if (routeVariants.length === 0) {
+                    boundSelect.innerHTML = '<option value="">-- 無效路線 --</option>';
+                    return;
+                }
+
+                let optionsHtml = '<option value="">-- 請選擇行車方向 --</option>';
                 routeVariants.forEach((v, index) => {
                     let boundVal = v.bound;
                     if (boundVal === 'O') boundVal = 'outbound';
@@ -1055,9 +1082,9 @@
                     const serviceNote = (serviceType !== '1') ? ' [特別班次]' : '';
                     optionsHtml += `<option value="${boundVal}" data-service="${serviceType}" data-orig="${orig}" data-dest="${dest}">往 ${dest} (由 ${orig} 開出)${serviceNote}</option>`;
                 });
-            }
 
-            boundSelect.innerHTML = optionsHtml;
+                boundSelect.innerHTML = optionsHtml;
+            }
         }
 
         async function onBoundChange() {
@@ -1075,7 +1102,6 @@
             await fetchStopsForSelectedRoute();
         }
 
-        // 統一獲取車站詳細資料（含快取與 GPS 座標）
         async function getStopInfo(company, stopId) {
             const directory = (company === 'kmb') ? kmbStopsDirectory : ctbStopsDirectory;
             if (directory.has(stopId)) {
@@ -1141,8 +1167,20 @@
                     return;
                 }
 
-                for (let i = 0; i < rawStops.length; i++) {
-                    const st = rawStops[i];
+                rawStops.sort((a, b) => parseInt(a.seq) - parseInt(b.seq));
+
+                const uniqueStops = [];
+                const seenSeq = new Set();
+                for (const st of rawStops) {
+                    const seqNum = parseInt(st.seq);
+                    if (!seenSeq.has(seqNum)) {
+                        seenSeq.add(seqNum);
+                        uniqueStops.push(st);
+                    }
+                }
+
+                for (let i = 0; i < uniqueStops.length; i++) {
+                    const st = uniqueStops[i];
                     const stopId = st.stop;
                     const stopInfo = await getStopInfo(currentCompany, stopId);
                     currentRouteStops.push({ seq: i + 1, stopId: stopId, name: stopInfo.name });
@@ -1223,9 +1261,6 @@
             updateFavButtonState();
         }
 
-        /**
-         * 專家級重構對齊邏輯：三層式合辦路線車站精準對齊 (GPS 物理距離 -> 核心站名匹配 -> 比例備用)
-         */
         async function fetchCoCompanyData(route, bound, seq, currentComp) {
             const coComp = (currentComp === 'kmb') ? 'ctb' : 'kmb';
 
@@ -1250,9 +1285,11 @@
 
                 if (outStops.length === 0 && inStops.length === 0) return null;
 
+                outStops.sort((a, b) => parseInt(a.seq) - parseInt(b.seq));
+                inStops.sort((a, b) => parseInt(a.seq) - parseInt(b.seq));
+
                 const primaryDest = (currentActiveStop ? (currentActiveStop.dest || '') : '').trim();
 
-                // 取得兩巴終點站站名以進行方向對齊
                 async function getTerminusName(stopsList) {
                     if (!stopsList || stopsList.length === 0) return '';
                     const lastStopId = stopsList[stopsList.length - 1].stop;
@@ -1265,7 +1302,6 @@
                     getTerminusName(inStops)
                 ]);
 
-                // 模糊相似度計算
                 function calcSimilarity(str1, str2) {
                     if (!str1 || !str2) return 0;
                     let match = 0;
@@ -1292,7 +1328,6 @@
                     targetCoDir = 'inbound';
                 }
 
-                // 取得當前主車站與合辦公司所有對應方向車站的詳細資訊
                 const activeStopInfo = await getStopInfo(currentComp, currentActiveStop.stopId);
                 const coStopsInfoList = await Promise.all(
                     targetCoStops.map(async (st, idx) => {
@@ -1309,7 +1344,6 @@
 
                 let bestMatchedStop = null;
 
-                // 第一層：GPS 經緯度物理距離配對（最高精準度）
                 if (activeStopInfo.lat && activeStopInfo.long) {
                     let minDistance = Infinity;
                     let closestStop = null;
@@ -1324,13 +1358,11 @@
                         }
                     }
 
-                    // 距離在 350 米以內即視為精確同站點配對
                     if (closestStop && minDistance <= 350) {
                         bestMatchedStop = closestStop;
                     }
                 }
 
-                // 第二層：站名關鍵字模糊配對
                 if (!bestMatchedStop) {
                     const cleanName = (str) => str.replace(/(轉車站|巴士總站|轉乘站|收費廣場|BBI|（.*）|\(.*\))/g, '').trim();
                     const cleanedCurrent = cleanName(activeStopInfo.name || currentActiveStop.stopName || '');
@@ -1344,7 +1376,6 @@
                     }
                 }
 
-                // 第三層保底：相對比例序列索引
                 if (!bestMatchedStop && coStopsInfoList.length > 0) {
                     const ratio = (seq - 1) / Math.max(1, (currentActiveStop.totalStops || 1) - 1);
                     const targetIdx = Math.min(Math.round(ratio * (coStopsInfoList.length - 1)), coStopsInfoList.length - 1);
@@ -1522,7 +1553,6 @@
                     }).join('');
                 }
 
-                // 修改重點 2：優化合辦路線資訊展示，刪除「合辦路線對應第X站」及「最近3班」字眼
                 if (isJoint && coCompanyResult) {
                     const coCompName = coCompanyResult.coComp === 'kmb' ? '九巴 (KMB)' : '城巴 (CTB)';
                     const badgeClass = coCompanyResult.coComp === 'kmb' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950';
@@ -1887,109 +1917,145 @@
                             container.innerHTML = `<div class="text-center py-10 text-amber-400 text-xs"><i class="fa-solid fa-circle-info text-2xl mb-2 block"></i><p>附近 ${currentGpsRadius} 米內找不到巴士路線</p></div>`;
                         } else {
                             container.innerHTML = matchedCandidates.slice(0, 30).map(c => `
-                                <div onclick="selectGpsRouteItem('${c.company}', '${c.route}', '${c.bound}', '${c.serviceType}', '${c.stopId}', '${c.stopName.replace(/'/g, "\\'")}', ${c.seq}, '${c.dest.replace(/'/g, "\\'")}')" class="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-2.5 rounded-xl cursor-pointer flex items-center justify-between transition">
+                                <div onclick="selectGpsRouteItem('${c.company}', '${c.route}', '${c.bound}', '${c.serviceType}', '${c.stopId}', '${c.stopName.replace(/'/g, "\\'")}', ${c.seq}, '${c.dest.replace(/'/g, "\\'")}')" class="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between text-xs transition shadow-sm">
                                     <div class="flex items-center gap-2 overflow-hidden">
-                                        <span class="bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded shrink-0">九巴</span>
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white shrink-0">${c.company.toUpperCase()}</span>
                                         <span class="font-extrabold text-indigo-400 text-sm shrink-0">${c.route}</span>
                                         <div class="overflow-hidden">
-                                            <p class="text-xs font-bold text-slate-100 truncate">${c.stopName}</p>
+                                            <p class="font-bold text-slate-200 truncate">${c.stopName}</p>
                                             <p class="text-[10px] text-slate-400 truncate">往 ${c.dest}</p>
                                         </div>
                                     </div>
-                                    <span class="text-[10px] font-bold text-emerald-400 shrink-0 ml-2">${c.distance}m</span>
+                                    <div class="text-right shrink-0">
+                                        <span class="text-emerald-400 font-extrabold text-xs">${c.distance}m</span>
+                                    </div>
                                 </div>
                             `).join('');
                         }
 
                     } catch (err) {
-                        console.error("GPS Search Error:", err);
-                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>GPS 搜尋失敗，請再試一次</p></div>`;
+                        console.error("GPS search failed:", err);
+                        container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>搜尋附近路線時發生錯誤</p></div>`;
                     } finally {
                         isGpsSearching = false;
                     }
                 },
                 (err) => {
-                    container.innerHTML = `<div class="text-center py-10 text-rose-400 text-xs"><p>無法獲取定位權限，請開啟裝置 GPS 權限</p></div>`;
+                    container.innerHTML = `<div class="text-center py-10 text-amber-400 text-xs"><p>無法獲取 GPS 定位權限</p></div>`;
                     isGpsSearching = false;
                 },
-                { timeout: 10000, enableHighAccuracy: true }
+                { timeout: 8000, maximumAge: 30000, enableHighAccuracy: true }
             );
         }
 
         function selectGpsRouteItem(company, route, bound, serviceType, stopId, stopName, seq, dest) {
-            closeGpsSearchModal();
             currentCompany = company;
             selectedRoute = route;
-            selectedBound = { bound, serviceType, orig: '', dest };
-
+            selectedBound = { bound, serviceType, dest };
             currentActiveStop = {
-                company,
-                route,
-                bound,
-                serviceType,
-                stopId,
-                stopName,
-                seq,
-                totalStops: seq,
-                dest
+                company: company,
+                route: route,
+                bound: bound,
+                serviceType: serviceType || '1',
+                stopId: stopId,
+                stopName: stopName,
+                seq: seq,
+                dest: dest,
+                totalStops: 0
             };
-
+            closeGpsSearchModal();
             renderActiveStopDashboard();
             fetchRealTimeETA();
-
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
             autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
             fetchStopsForSelectedRoute(true);
         }
 
-        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
-        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
-        function toggleApiKeyInput() { document.getElementById('apiKeyPanel').classList.toggle('hidden'); }
+        function openAiModal() {
+            document.getElementById('aiAssistantModal').classList.remove('hidden');
+        }
+
+        function closeAiModal() {
+            document.getElementById('aiAssistantModal').classList.add('hidden');
+        }
+
+        function toggleApiKeyInput() {
+            const panel = document.getElementById('apiKeyPanel');
+            panel.classList.toggle('hidden');
+        }
+
         function saveApiKey() {
-            const key = document.getElementById('geminiApiKeyInput').value.trim();
-            userApiKey = key;
-            localStorage.setItem('gemini_custom_apikey', key);
-            alert('API Key 已成功儲存！');
-            document.getElementById('apiKeyPanel').classList.add('hidden');
+            const val = document.getElementById('geminiApiKeyInput').value.trim();
+            userApiKey = val;
+            localStorage.setItem('gemini_custom_apikey', val);
+            alert('Gemini API Key 已儲存！');
+            toggleApiKeyInput();
         }
 
         async function sendAiMessage() {
             const input = document.getElementById('aiInput');
-            const msg = input.value.trim();
-            if (!msg) return;
+            const text = input.value.trim();
+            if (!text) return;
 
             const chatBox = document.getElementById('aiChatBox');
-            chatBox.innerHTML += `<div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs ml-auto leading-relaxed shadow">${msg}</div>`;
+            chatBox.innerHTML += `
+                <div class="flex justify-end">
+                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
+                        ${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                    </div>
+                </div>
+            `;
             input.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            const loadingId = 'ai-loading-' + Date.now();
-            chatBox.innerHTML += `<div id="${loadingId}" class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-300 leading-relaxed"><i class="fa-solid fa-spinner fa-spin mr-1 text-indigo-400"></i>AI 正在思考中...</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
+            if (!userApiKey) {
+                chatBox.innerHTML += `
+                    <div class="bg-amber-950/80 border border-amber-700/50 rounded-2xl p-2.5 max-w-[88%] text-xs text-amber-200 leading-relaxed">
+                        請先點擊右上角「金鑰」按鈕輸入您的 Gemini API Key，才能使用 AI 助理功能。
+                    </div>
+                `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+                return;
+            }
+
+            const sendBtn = document.getElementById('aiSendBtn');
+            const sendIcon = document.getElementById('aiSendIcon');
+            sendBtn.disabled = true;
+            sendIcon.className = "fa-solid fa-spinner fa-spin";
 
             try {
-                if (!userApiKey) {
-                    document.getElementById(loadingId).innerHTML = `請先點擊右上角「金鑰」按鈕設定 Gemini API Key 後再試。`;
-                    return;
-                }
-
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{
-                            parts: [{ text: `你是一名香港本地交通專家。請簡短精準答覆用戶的問題：${msg}` }]
+                            parts: [{ text: `你是一名香港本地交通專家與助手。請用簡短清晰的繁體中文回答以下關於香港巴士或交通的問題：\n\n${text}` }]
                         }]
                     })
                 });
 
-                const data = await response.json();
-                const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，無法取得 AI 回應。";
-                document.getElementById(loadingId).innerHTML = aiReply.replace(/\n/g, '<br>');
+                const data = await res.json();
+                let aiReply = "抱歉，Gemini AI 暫時無法回應，請稍後再試。";
+                if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    aiReply = data.candidates[0].content.parts[0].text;
+                }
+
+                chatBox.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
+                        ${aiReply.replace(/\n/g, '<br>')}
+                    </div>
+                `;
             } catch (err) {
-                document.getElementById(loadingId).innerHTML = "連線失敗，請檢查 API Key 或網路設定。";
+                chatBox.innerHTML += `
+                    <div class="bg-rose-950/80 border border-rose-700/50 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
+                        請求 AI 服務時發生錯誤，請檢查網路或 API Key 是否正確。
+                    </div>
+                `;
+            } finally {
+                sendBtn.disabled = false;
+                sendIcon.className = "fa-solid fa-paper-plane";
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
