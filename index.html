@@ -1633,25 +1633,26 @@
                     const point = [st.lat, st.long];
                     latLngs.push(point);
 
-                    // 建立彈出視窗（Popup）中的「上一站」與「下一站」快捷鍵 HTML
+                    // 建立彈出視窗（Popup）中的「上一站」與「下一站」快捷鍵 HTML (字體減小 1px 至 10px)
                     const hasPrev = st.seq > 1;
                     const hasNext = st.seq < currentRouteStops.length;
 
                     const navButtonsHtml = `
                         <div style="margin-top: 6px; display: flex; gap: 6px; justify-content: center; align-items: center;">
                             ${hasPrev 
-                                ? `<button onclick="jumpToStopBySeq(${st.seq - 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">上一站</button>`
-                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: not-allowed;">上一站</button>`
+                                ? `<button onclick="jumpToStopBySeq(${st.seq - 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">上一站</button>`
+                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: not-allowed;">上一站</button>`
                             }
                             ${hasNext 
-                                ? `<button onclick="jumpToStopBySeq(${st.seq + 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">下一站</button>`
-                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: not-allowed;">下一站</button>`
+                                ? `<button onclick="jumpToStopBySeq(${st.seq + 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">下一站</button>`
+                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: not-allowed;">下一站</button>`
                             }
                         </div>
                     `;
 
+                    // 地圖車站名稱字體增加 2px 至 15px
                     const popupContent = `
-                        <div style="font-weight:bold; font-size:13px; color:#ffffff; text-align:center;">
+                        <div style="font-weight:bold; font-size:15px; color:#ffffff; text-align:center;">
                             ${st.seq}. ${st.name}
                             ${navButtonsHtml}
                         </div>
@@ -1971,52 +1972,46 @@
             try {
                 let contextPrompt = `你是一位精通香港公共交通的專家。請用簡短、清晰、親切的廣東話回答。`;
                 if (currentActiveStop) {
-                    contextPrompt += `目前使用者選擇的路線為：${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route} 往 ${currentActiveStop.dest}，當前車站：${currentActiveStop.stopName}。`;
+                    contextPrompt += `目前使用者正於 ${currentActiveStop.stopName} 查看 ${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route} 號巴士（往 ${currentActiveStop.dest} 方向）。`;
                 }
 
                 const apiKeyToUse = userApiKey;
                 if (!apiKeyToUse) {
-                    throw new Error("未設定 Gemini API Key，請點擊右上角「金鑰」輸入有效的 API Key。");
+                    throw new Error("請先設定 Gemini API Key。");
                 }
 
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`;
-                const res = await fetch(endpoint, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [
-                            {
-                                role: 'user',
-                                parts: [{ text: `${contextPrompt}\n\n使用者提問：${text}` }]
-                            }
-                        ]
+                        contents: [{
+                            parts: [
+                                { text: contextPrompt },
+                                { text: text }
+                            ]
+                        }]
                     })
                 });
 
-                if (!res.ok) {
-                    const errData = await res.json().catch(()=>({}));
-                    throw new Error(errData.error?.message || `請求失敗 (${res.status})`);
+                const data = await res.json();
+                document.getElementById(loadingId)?.remove();
+
+                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    const aiReply = data.candidates[0].content.parts[0].text;
+                    chatBox.innerHTML += `
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
+                            ${aiReply.replace(/\n/g, '<br>')}
+                        </div>
+                    `;
+                } else {
+                    throw new Error("回覆格式異常");
                 }
 
-                const resData = await res.json();
-                const aiReply = resData.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，暫時無法回應，請稍後再試。";
-
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-
-                chatBox.innerHTML += `
-                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed space-y-1">
-                        ${aiReply.replace(/\n/g, '<br>')}
-                    </div>
-                `;
-
             } catch (err) {
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-
+                document.getElementById(loadingId)?.remove();
                 chatBox.innerHTML += `
-                    <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
-                        ${err.message || '發生未知錯誤，請重試。'}
+                    <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-300">
+                        ${err.message || '查詢失敗，請檢查 API Key 或網路連線。'}
                     </div>
                 `;
             } finally {
