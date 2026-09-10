@@ -57,17 +57,17 @@
             background: #475569;
             border-radius: 4px;
         }
-        /* Leaflet divIcon 背景透明處理 */
-        .leaflet-div-icon {
-            background: transparent !important;
-            border: none !important;
-        }
         /* Leaflet popup dark theme customization */
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
             background: #0f172a !important;
             color: #f8fafc !important;
             border: 1px solid #334155;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+        /* Remove default white border box on Leaflet DivIcons */
+        .leaflet-div-icon {
+            background: transparent !important;
+            border: none !important;
         }
     </style>
 </head>
@@ -112,7 +112,7 @@
             <!-- Row 2: Search Buttons & Last Update Time -->
             <div id="busNavActions" class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80 hidden">
                 <div class="flex items-center gap-1.5 flex-1">
-                    <button onclick="openSearchModal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
+                    <button onclick="openSearchModal()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-1.5 px-2.5 rounded-xl shadow flex items-center justify-center gap-1.5 transition active:scale-95 text-xs">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <span>搜尋路線</span>
                     </button>
@@ -154,7 +154,7 @@
                         <div class="flex items-center gap-2 overflow-hidden">
                             <span id="displayCompanyTag" class="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0">九巴 (KMB)</span>
                             <span id="displayRouteSeq" class="hidden">路線 --</span>
-                            <p id="displayBoundInfo" class="text-base font-bold text-indigo-400 truncate">請點擊上方的搜尋按鈕</p>
+                            <p id="displayBoundInfo" class="text-base font-bold text-indigo-400 truncate">請點擊上方的搜尋路線按鈕</p>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button id="favBtn" onclick="toggleFavorite()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 transition text-xs">
@@ -173,7 +173,7 @@
                 </div>
 
                 <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col overflow-y-auto no-scrollbar min-h-0 gap-3">
-                    <!-- 班次預報區域 -->
+                    <!-- 班次預報區域 (放置向上移的城巴與九巴預報) -->
                     <div id="etaListContainer" class="w-full flex flex-col gap-2 shrink-0">
                         <div class="text-center py-8 text-slate-500">
                             <i class="fa-solid fa-bus text-3xl mb-2 block text-slate-700"></i>
@@ -181,7 +181,7 @@
                         </div>
                     </div>
 
-                    <!-- 地圖顯示區域 -->
+                    <!-- 地圖顯示區域 (位於班次預報正下方) -->
                     <div id="busMapContainer" class="w-full h-48 sm:h-56 rounded-2xl border border-slate-800 shadow-md overflow-hidden shrink-0 relative bg-slate-950">
                         <div id="busMap" class="w-full h-full"></div>
                     </div>
@@ -427,17 +427,6 @@
             }
         }
 
-        function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
         let currentMode = 'mtr'; 
         let kmbRoutes = [];
         let ctbRoutes = [];
@@ -466,11 +455,11 @@
         let selectedMtrStation = '';
         let selectedMtrFilterLine = 'ALL';
 
-        // 地圖變數
+        // 地圖變數 (Map instances)
         let busMap = null;
         let mapMarkersGroup = null;
         let mapPolyline = null;
-        let mapDecorator = null;
+        let mapDecorator = null; // 方向箭咀繪製層
 
         const hkDistricts = [
             { name: '油尖旺', hkoName: '京士柏', altNames: ['香港天文台', '九龍'], lat: 22.3019, lng: 114.1742 },
@@ -514,6 +503,17 @@
             switchMode('mtr');
             renderFavorites();
         };
+
+        function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
         function isJointRoute(routeNum) {
             if (!routeNum) return false;
@@ -1364,7 +1364,7 @@
             }
         }
 
-        // 優化需求 4: 整合主公司與合辦公司班次，統一由左至右顯示最近的 3 個班次
+        // 優化 4: 整合主公司與合辦公司的班次，在同一行顯示最近 3 個班次
         async function fetchRealTimeETA() {
             if (!currentActiveStop) return;
 
@@ -1377,7 +1377,7 @@
             const isJoint = isJointRoute(currentActiveStop.route);
 
             try {
-                let etas = [];
+                let primaryEtas = [];
                 const targetDir = (currentActiveStop.bound === 'inbound' || currentActiveStop.bound === 'I') ? 'I' : 'O';
 
                 const fetchPrimaryPromise = (async () => {
@@ -1388,14 +1388,14 @@
                             const list = data.data || [];
                             const targetServiceType = String(currentActiveStop.serviceType || '1');
                             
-                            etas = list.filter(item => 
+                            primaryEtas = list.filter(item => 
                                 String(item.route) === String(currentActiveStop.route) && 
                                 String(item.dir) === targetDir && 
                                 String(item.service_type) === targetServiceType
                             );
 
-                            if (etas.length === 0) {
-                                etas = list.filter(item => 
+                            if (primaryEtas.length === 0) {
+                                primaryEtas = list.filter(item => 
                                     String(item.route) === String(currentActiveStop.route) && 
                                     String(item.dir) === targetDir
                                 );
@@ -1406,7 +1406,7 @@
                         if (res.ok) {
                             const data = await res.json();
                             const list = data.data || [];
-                            etas = list.filter(item => {
+                            primaryEtas = list.filter(item => {
                                 let itemDir = item.dir;
                                 if (itemDir === 'O') itemDir = 'outbound';
                                 if (itemDir === 'I') itemDir = 'inbound';
@@ -1423,21 +1423,21 @@
 
                 await fetchPrimaryPromise;
 
-                // 收集並標記所有有效班次
-                let allValidEtas = [];
+                // 彙整並統一處理兩間公司的班次資料
+                let mergedEtas = [];
 
-                etas.forEach((item) => {
+                primaryEtas.forEach((item) => {
                     if (!item.eta) return;
                     const etaMs = new Date(item.eta).getTime();
                     const diffMs = etaMs - nowMs;
                     const diffSec = Math.floor(diffMs / 1000);
+
                     if (diffSec >= -30) {
-                        allValidEtas.push({
+                        mergedEtas.push({
                             ...item,
                             company: currentActiveStop.company,
                             diffSec,
-                            diffMs,
-                            etaMs
+                            diffMs
                         });
                     }
                 });
@@ -1448,24 +1448,24 @@
                         const etaMs = new Date(item.eta).getTime();
                         const diffMs = etaMs - nowMs;
                         const diffSec = Math.floor(diffMs / 1000);
+
                         if (diffSec >= -30) {
-                            allValidEtas.push({
+                            mergedEtas.push({
                                 ...item,
                                 company: coCompanyResult.coComp,
                                 diffSec,
-                                diffMs,
-                                etaMs
+                                diffMs
                             });
                         }
                     });
                 }
 
-                // 排序：到站時間由近至遠排序
-                allValidEtas.sort((a, b) => a.etaMs - b.etaMs);
+                // 按照到達時間由近至遠排序
+                mergedEtas.sort((a, b) => a.diffMs - b.diffMs);
 
                 let htmlContent = '';
 
-                if (allValidEtas.length === 0) {
+                if (mergedEtas.length === 0) {
                     htmlContent = `
                         <div class="text-center py-6 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
@@ -1473,24 +1473,23 @@
                         </div>
                     `;
                 } else {
-                    // 取最近的 3 個班次
-                    const top3 = allValidEtas.slice(0, 3);
+                    // 取出最接近的 3 個班次
+                    const top3Etas = mergedEtas.slice(0, 3);
                     
                     htmlContent += `<div class="grid grid-cols-3 gap-2 w-full">`;
                     
                     for (let idx = 0; idx < 3; idx++) {
-                        const item = top3[idx];
+                        const item = top3Etas[idx];
                         if (item) {
-                            const comp = item.company;
-                            const compName = comp === 'kmb' ? '九巴' : '城巴';
-                            const compBadgeClass = comp === 'kmb' 
-                                ? 'bg-rose-600 text-white' 
-                                ? 'bg-rose-600 text-white' 
-                                : 'bg-amber-500 text-slate-950';
-
                             const etaTimeStr = new Date(item.eta).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
                             const diffSec = item.diffSec;
                             const diffMins = Math.max(0, Math.floor(item.diffMs / 60000));
+
+                            const isKmb = item.company === 'kmb';
+                            const compBadgeClass = isKmb 
+                                ? 'bg-rose-600 text-white' 
+                                : 'bg-amber-500 text-slate-950';
+                            const compName = isKmb ? '九巴' : '城巴';
 
                             let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
                             
@@ -1501,17 +1500,17 @@
                             }
 
                             htmlContent += `
-                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col items-center justify-between text-center shadow-sm min-h-[90px]">
-                                    <div class="flex items-center justify-center w-full">
-                                        <span class="${compBadgeClass} text-[10px] font-black px-2 py-0.5 rounded tracking-wider shadow-sm">${compName}</span>
-                                    </div>
-                                    <div class="my-1">${timeBadge}</div>
+                                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col items-center justify-between text-center shadow-sm min-h-[92px]">
+                                    <span class="${compBadgeClass} text-[9px] font-black px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                                        ${compName}
+                                    </span>
+                                    <div class="my-0.5 flex items-center justify-center">${timeBadge}</div>
                                     <div class="text-[10px] text-slate-400 font-mono">${etaTimeStr}</div>
                                 </div>
                             `;
                         } else {
                             htmlContent += `
-                                <div class="bg-slate-950/50 border border-slate-800/50 rounded-xl p-2 flex flex-col items-center justify-center text-center text-slate-600 min-h-[90px]">
+                                <div class="bg-slate-950/50 border border-slate-800/50 rounded-xl p-2 flex flex-col items-center justify-center text-center text-slate-600 min-h-[92px]">
                                     <div class="text-sm font-bold text-slate-600">--</div>
                                 </div>
                             `;
@@ -1529,7 +1528,7 @@
             }
         }
 
-        // 優化需求 2 & 3: 地圖線條改為紅色，站點改為 Google Maps 圖標風格
+        // 優化 2 & 3: 動態地圖渲染，軌跡改為紅色，站點改為 Google Map 風格定位點 (Pin Icon)
         function updateBusMap() {
             if (!currentActiveStop) return;
 
@@ -1562,28 +1561,31 @@
             const latLngs = [];
             let currentStopLatLng = null;
 
-            // 定義 Google Map 風格標記圖標
-            const currentPinIcon = L.divIcon({
-                className: 'custom-pin-icon',
+            // Google Map 風格的 Pin Icon 定義
+            const activePinIcon = L.divIcon({
+                className: 'custom-map-pin-active',
                 html: `
-                    <div style="position: relative; width: 32px; height: 38px; text-align: center;">
-                        <i class="fa-solid fa-location-dot" style="font-size: 36px; color: #ef4444; filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6));"></i>
-                        <i class="fa-solid fa-circle" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #ffffff;"></i>
-                    </div>`,
-                iconSize: [32, 38],
-                iconAnchor: [16, 38],
-                popupAnchor: [0, -38]
+                    <div class="relative flex items-center justify-center">
+                        <i class="fa-solid fa-location-dot text-rose-600 text-3xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"></i>
+                        <div class="absolute w-2 h-2 bg-white rounded-full -mt-2"></div>
+                    </div>
+                `,
+                iconSize: [30, 36],
+                iconAnchor: [15, 36],
+                popupAnchor: [0, -36]
             });
 
-            const normalPinIcon = L.divIcon({
-                className: 'custom-pin-icon',
+            const defaultPinIcon = L.divIcon({
+                className: 'custom-map-pin-default',
                 html: `
-                    <div style="position: relative; width: 22px; height: 28px; text-align: center;">
-                        <i class="fa-solid fa-location-dot" style="font-size: 26px; color: #3b82f6; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));"></i>
-                    </div>`,
-                iconSize: [22, 28],
-                iconAnchor: [11, 28],
-                popupAnchor: [0, -28]
+                    <div class="relative flex items-center justify-center opacity-85 hover:opacity-100 transition">
+                        <i class="fa-solid fa-location-dot text-blue-500 text-xl drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]"></i>
+                        <div class="absolute w-1.5 h-1.5 bg-white rounded-full -mt-1"></div>
+                    </div>
+                `,
+                iconSize: [22, 26],
+                iconAnchor: [11, 26],
+                popupAnchor: [0, -26]
             });
 
             currentRouteStops.forEach((st) => {
@@ -1594,13 +1596,13 @@
 
                     if (isCurrent) {
                         currentStopLatLng = point;
-                        const redMarker = L.marker(point, { icon: currentPinIcon })
+                        const redMarker = L.marker(point, { icon: activePinIcon })
                             .bindPopup(`<div style="font-weight:bold; font-size:13px; color:#ffffff;">${st.seq}. ${st.name} <span style="color:#f43f5e; font-size:11px;">(當前車站)</span></div>`);
                         
                         mapMarkersGroup.addLayer(redMarker);
                         redMarker.openPopup();
                     } else {
-                        const stopMarker = L.marker(point, { icon: normalPinIcon })
+                        const stopMarker = L.marker(point, { icon: defaultPinIcon })
                             .bindPopup(`<div style="font-weight:bold; font-size:12px; color:#ffffff;">${st.seq}. ${st.name}</div>`);
                         mapMarkersGroup.addLayer(stopMarker);
                     }
@@ -1608,14 +1610,14 @@
             });
 
             if (latLngs.length > 1) {
-                // 將軌跡線條改為紅色 (#ef4444)
+                // 行車軌跡統一設為紅色 (#e11d48)
                 mapPolyline = L.polyline(latLngs, {
-                    color: '#ef4444',
+                    color: '#e11d48',
                     weight: 4,
                     opacity: 0.85
                 }).addTo(busMap);
 
-                // 方向箭咀裝飾器
+                // 方向箭咀裝飾器 (PolylineDecorator)
                 if (typeof L.polylineDecorator === 'function') {
                     mapDecorator = L.polylineDecorator(mapPolyline, {
                         patterns: [
@@ -1850,14 +1852,8 @@
             `).join('');
         }
 
-        function openAiModal() {
-            document.getElementById('aiAssistantModal').classList.remove('hidden');
-        }
-
-        function closeAiModal() {
-            document.getElementById('aiAssistantModal').classList.add('hidden');
-        }
-
+        function openAiModal() { document.getElementById('aiAssistantModal').classList.remove('hidden'); }
+        function closeAiModal() { document.getElementById('aiAssistantModal').classList.add('hidden'); }
         function toggleApiKeyInput() {
             const panel = document.getElementById('apiKeyPanel');
             panel.classList.toggle('hidden');
@@ -1867,78 +1863,96 @@
             const val = document.getElementById('geminiApiKeyInput').value.trim();
             userApiKey = val;
             localStorage.setItem('gemini_custom_apikey', val);
-            alert(val ? 'Gemini API Key 已設定！' : '已清除自訂 API Key。');
-            toggleApiKeyInput();
+            alert(val ? "API Key 已成功儲存！" : "已清除自訂 API Key。");
+            document.getElementById('apiKeyPanel').classList.add('hidden');
         }
 
         async function sendAiMessage() {
-            const input = document.getElementById('aiInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-
+            const inputEl = document.getElementById('aiInput');
             const chatBox = document.getElementById('aiChatBox');
+            const sendBtn = document.getElementById('aiSendBtn');
+            const sendIcon = document.getElementById('aiSendIcon');
+
+            const text = inputEl.value.trim();
+            if (!text) return;
+
+            inputEl.value = '';
+            
             chatBox.innerHTML += `
                 <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed shadow-sm">
-                        ${msg}
+                    <div class="bg-indigo-600 text-white rounded-2xl p-2.5 max-w-[85%] text-xs leading-relaxed">
+                        ${text}
                     </div>
                 </div>
             `;
-            input.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            if (!userApiKey) {
-                chatBox.innerHTML += `
-                    <div class="bg-slate-800 border border-amber-500/40 text-amber-300 rounded-2xl p-2.5 max-w-[88%] text-xs leading-relaxed">
-                        請先點擊右上角「金鑰」按鈕設定你的 Gemini API Key 才能使用 AI 功能。
-                    </div>
-                `;
-                chatBox.scrollTop = chatBox.scrollHeight;
-                return;
-            }
+            const loadingId = 'ai-loading-' + Date.now();
+            chatBox.innerHTML += `
+                <div id="${loadingId}" class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[85%] text-xs text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i>
+                    <span>AI 思考中...</span>
+                </div>
+            `;
+            chatBox.scrollTop = chatBox.scrollHeight;
 
-            const sendBtn = document.getElementById('aiSendBtn');
-            const sendIcon = document.getElementById('aiSendIcon');
             sendBtn.disabled = true;
-            sendIcon.className = "fa-solid fa-spinner fa-spin text-xs";
+            sendIcon.className = "fa-solid fa-circle-notch fa-spin";
 
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`, {
+                let contextPrompt = `你是一位精通香港公共交通的專家。請用簡短、清晰、親切的廣東話回答。`;
+                if (currentActiveStop) {
+                    contextPrompt += `目前使用者選擇的路線為：${currentActiveStop.company.toUpperCase()} ${currentActiveStop.route} 往 ${currentActiveStop.dest}，當前車站：${currentActiveStop.stopName}。`;
+                }
+
+                const apiKeyToUse = userApiKey;
+                if (!apiKeyToUse) {
+                    throw new Error("未設定 Gemini API Key，請點擊右上角「金鑰」輸入有效的 API Key。");
+                }
+
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyToUse}`;
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: `你是一名熟悉的香港公共交通專家。請以精簡繁體中文解答關於香港巴士、地鐵、轉乘優惠的問題。用戶提問：${msg}`
-                            }]
-                        }]
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [{ text: `${contextPrompt}\n\n使用者提問：${text}` }]
+                            }
+                        ]
                     })
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法回應。';
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed">
-                            ${reply.replace(/\n/g, '<br>')}
-                        </div>
-                    `;
-                } else {
-                    chatBox.innerHTML += `
-                        <div class="bg-slate-800 border border-rose-500/40 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
-                            請求失敗，請檢查 API Key 是否正確。
-                        </div>
-                    `;
+                if (!res.ok) {
+                    const errData = await res.json().catch(()=>({}));
+                    throw new Error(errData.error?.message || `請求失敗 (${res.status})`);
                 }
-            } catch (err) {
+
+                const resData = await res.json();
+                const aiReply = resData.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，暫時無法回應，請稍後再試。";
+
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+
                 chatBox.innerHTML += `
-                    <div class="bg-slate-800 border border-rose-500/40 text-rose-300 rounded-2xl p-2.5 max-w-[88%] text-xs">
-                        網路連線失敗，請重試。
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 max-w-[88%] text-xs text-slate-200 leading-relaxed space-y-1">
+                        ${aiReply.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+
+            } catch (err) {
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+
+                chatBox.innerHTML += `
+                    <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
+                        ⚠️ 提示：${err.message}
                     </div>
                 `;
             } finally {
                 sendBtn.disabled = false;
-                sendIcon.className = "fa-solid fa-paper-plane text-xs";
+                sendIcon.className = "fa-solid fa-paper-plane";
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
         }
