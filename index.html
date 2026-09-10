@@ -764,7 +764,7 @@
                                 </div>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="font-black text-2xl sm:text-3xl ${isSpecialState ? 'text-amber-400' : 'text-emerald-400'}">
+                                <span class="font-black text-[26px] sm:text-[32px] ${isSpecialState ? 'text-amber-400' : 'text-emerald-400'}">
                                     ${statusText}
                                 </span>
                             </div>
@@ -1502,21 +1502,23 @@
                                 : 'bg-amber-500 text-slate-950';
                             const compName = isKmb ? '九巴' : '城巴';
 
-                            let timeBadge = `<span class="text-xl sm:text-2xl font-black text-emerald-400">${diffMins} <span class="text-xs font-normal text-slate-400">分鐘</span></span>`;
+                            /* 字體加大 2px：倒數數字改為 text-[22px] sm:text-[26px]，單位改為 text-[14px]，狀態改為 text-[18px] sm:text-[20px] */
+                            let timeBadge = `<span class="text-[22px] sm:text-[26px] font-black text-emerald-400">${diffMins} <span class="text-[14px] font-normal text-slate-400">分鐘</span></span>`;
                             
                             if (diffSec <= 0 && diffSec >= -30) {
-                                timeBadge = `<span class="text-base sm:text-lg font-black text-amber-400">正在離開</span>`;
+                                timeBadge = `<span class="text-[18px] sm:text-[20px] font-black text-amber-400">正在離開</span>`;
                             } else if (diffSec > 0 && diffSec <= 60) {
-                                timeBadge = `<span class="text-base sm:text-lg font-black text-amber-400">即將到達</span>`;
+                                timeBadge = `<span class="text-[18px] sm:text-[20px] font-black text-amber-400">即將到達</span>`;
                             }
 
+                            /* 到站時間字體加大 2px：改為 text-[12px] */
                             htmlContent += `
                                 <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col items-center justify-between text-center shadow-sm min-h-[92px]">
                                     <span class="${compBadgeClass} text-[9px] font-black px-1.5 py-0.5 rounded tracking-wide shrink-0">
                                         ${compName}
                                     </span>
                                     <div class="my-0.5 flex items-center justify-center">${timeBadge}</div>
-                                    <div class="text-[10px] text-slate-400 font-mono">${etaTimeStr}</div>
+                                    <div class="text-[12px] text-slate-400 font-mono">${etaTimeStr}</div>
                                 </div>
                             `;
                         } else {
@@ -1537,6 +1539,23 @@
                 console.error("ETA Fetch error:", err);
                 container.innerHTML = `<div class="text-center py-6 text-rose-400 text-xs"><i class="fa-solid fa-triangle-exclamation mb-1 text-base"></i><p>載入即時預報失敗，請點擊更新按鈕重試</p></div>`;
             }
+        }
+
+        // 當在地圖點選其他站點時，同步切換車站資訊並更新預報
+        function selectStopFromMap(stopId, stopName, seq) {
+            if (!currentActiveStop) return;
+            if (currentActiveStop.stopId === stopId) return;
+
+            currentActiveStop.stopId = stopId;
+            currentActiveStop.stopName = stopName;
+            currentActiveStop.seq = seq;
+
+            renderActiveStopDashboard();
+            fetchRealTimeETA();
+            updateBusMap();
+
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
         }
 
         // 動態地圖渲染，軌跡為紅色，站點為 Pin Icon
@@ -1589,7 +1608,7 @@
             const defaultPinIcon = L.divIcon({
                 className: 'custom-map-pin-default',
                 html: `
-                    <div class="relative flex items-center justify-center opacity-85 hover:opacity-100 transition">
+                    <div class="relative flex items-center justify-center opacity-85 hover:opacity-100 transition cursor-pointer">
                         <i class="fa-solid fa-location-dot text-blue-500 text-xl drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]"></i>
                         <div class="absolute w-1.5 h-1.5 bg-white rounded-full -mt-1"></div>
                     </div>
@@ -1615,6 +1634,12 @@
                     } else {
                         const stopMarker = L.marker(point, { icon: defaultPinIcon })
                             .bindPopup(`<div style="font-weight:bold; font-size:12px; color:#ffffff;">${st.seq}. ${st.name}</div>`);
+                        
+                        // 加入地圖 Marker 點擊事件監聽，實現點選地圖車站同步切換
+                        stopMarker.on('click', function() {
+                            selectStopFromMap(st.stopId, st.name, st.seq);
+                        });
+
                         mapMarkersGroup.addLayer(stopMarker);
                     }
                 }
