@@ -181,8 +181,8 @@
                         </div>
                     </div>
 
-                    <!-- 地圖顯示區域 (位於班次預報正下方) -->
-                    <div id="busMapContainer" class="w-full h-48 sm:h-56 rounded-2xl border border-slate-800 shadow-md overflow-hidden shrink-0 relative bg-slate-950">
+                    <!-- 地圖顯示區域 (改為 flex-1 自動填滿剩餘空間，增加 min-h 與 z-0 隔離層級) -->
+                    <div id="busMapContainer" class="w-full flex-1 min-h-[220px] rounded-2xl border border-slate-800 shadow-md overflow-hidden relative bg-slate-950 z-0">
                         <div id="busMap" class="w-full h-full"></div>
                     </div>
                 </div>
@@ -258,8 +258,8 @@
 
     </div>
 
-    <!-- Modals -->
-    <div id="busSearchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <!-- Modals (提升 z-index 至 z-[9999] 確保徹底覆蓋 Leaflet 地圖) -->
+    <div id="busSearchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -284,7 +284,7 @@
                         <input type="text" id="routeSearchInput" oninput="onRouteInput(event)" placeholder="輸入路線 (如: 1A, 968, A11)..." autocomplete="off" class="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3 py-2.5 pl-9 focus:outline-none focus:border-indigo-500 text-sm" />
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
                     </div>
-                    <div id="routeAutocompleteDropdown" class="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-56 overflow-y-auto shadow-2xl z-50 hidden"></div>
+                    <div id="routeAutocompleteDropdown" class="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-56 overflow-y-auto shadow-2xl z-[10000] hidden"></div>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">行車方向：</label>
@@ -312,7 +312,7 @@
         </div>
     </div>
 
-    <div id="changeStopModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div id="changeStopModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[75vh]">
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <div>
@@ -341,7 +341,7 @@
         </div>
     </div>
 
-    <div id="aiAssistantModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div id="aiAssistantModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col h-[85vh]">
             <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
                 <div class="flex items-center gap-2">
@@ -1295,7 +1295,7 @@
                         if (st.lat && st.long) {
                             const dist = calculateDistanceMeters(activeStopInfo.lat, activeStopInfo.long, st.lat, st.long);
                             if (dist < minDistance) {
-                                minDistance = dist;
+                                minDist = dist;
                                 closestStop = st;
                             }
                         }
@@ -1364,7 +1364,7 @@
             }
         }
 
-        // 優化 4: 整合主公司與合辦公司的班次，在同一行顯示最近 3 個班次
+        // 整合主公司與合辦公司的班次，包含「公司+到站時間」去重機制
         async function fetchRealTimeETA() {
             if (!currentActiveStop) return;
 
@@ -1460,12 +1460,23 @@
                     });
                 }
 
+                // 去重機制：依據「公司名稱 + 到站時間」進行過濾，解決兩筆資料完全重複問題
+                const seenEtaKeys = new Set();
+                const uniqueMergedEtas = [];
+                for (const item of mergedEtas) {
+                    const etaKey = `${item.company}_${item.eta}`;
+                    if (!seenEtaKeys.has(etaKey)) {
+                        seenEtaKeys.add(etaKey);
+                        uniqueMergedEtas.push(item);
+                    }
+                }
+
                 // 按照到達時間由近至遠排序
-                mergedEtas.sort((a, b) => a.diffMs - b.diffMs);
+                uniqueMergedEtas.sort((a, b) => a.diffMs - b.diffMs);
 
                 let htmlContent = '';
 
-                if (mergedEtas.length === 0) {
+                if (uniqueMergedEtas.length === 0) {
                     htmlContent = `
                         <div class="text-center py-6 text-slate-500">
                             <i class="fa-solid fa-triangle-exclamation text-2xl mb-2 block text-amber-500"></i>
@@ -1474,7 +1485,7 @@
                     `;
                 } else {
                     // 取出最接近的 3 個班次
-                    const top3Etas = mergedEtas.slice(0, 3);
+                    const top3Etas = uniqueMergedEtas.slice(0, 3);
                     
                     htmlContent += `<div class="grid grid-cols-3 gap-2 w-full">`;
                     
@@ -1528,7 +1539,7 @@
             }
         }
 
-        // 優化 2 & 3: 動態地圖渲染，軌跡改為紅色，站點改為 Google Map 風格定位點 (Pin Icon)
+        // 動態地圖渲染，軌跡為紅色，站點為 Pin Icon
         function updateBusMap() {
             if (!currentActiveStop) return;
 
