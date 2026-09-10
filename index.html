@@ -1558,6 +1558,15 @@
             autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
         }
 
+        // 依據車站序號（seq）跳轉至上/下一站
+        function jumpToStopBySeq(targetSeq) {
+            if (!currentRouteStops || currentRouteStops.length === 0) return;
+            const targetStop = currentRouteStops.find(s => s.seq === targetSeq);
+            if (targetStop) {
+                selectStopFromMap(targetStop.stopId, targetStop.name, targetStop.seq);
+            }
+        }
+
         // 動態地圖渲染，軌跡為紅色，站點為 Pin Icon
         function updateBusMap() {
             if (!currentActiveStop) return;
@@ -1624,16 +1633,40 @@
                     const point = [st.lat, st.long];
                     latLngs.push(point);
 
+                    // 建立彈出視窗（Popup）中的「上一站」與「下一站」快捷鍵 HTML
+                    const hasPrev = st.seq > 1;
+                    const hasNext = st.seq < currentRouteStops.length;
+
+                    const navButtonsHtml = `
+                        <div style="margin-top: 6px; display: flex; gap: 6px; justify-content: center; align-items: center;">
+                            ${hasPrev 
+                                ? `<button onclick="jumpToStopBySeq(${st.seq - 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">上一站</button>`
+                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: not-allowed;">上一站</button>`
+                            }
+                            ${hasNext 
+                                ? `<button onclick="jumpToStopBySeq(${st.seq + 1})" style="background: #3b82f6; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">下一站</button>`
+                                : `<button disabled style="background: #334155; color: #64748b; border: none; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: not-allowed;">下一站</button>`
+                            }
+                        </div>
+                    `;
+
+                    const popupContent = `
+                        <div style="font-weight:bold; font-size:13px; color:#ffffff; text-align:center;">
+                            ${st.seq}. ${st.name}
+                            ${navButtonsHtml}
+                        </div>
+                    `;
+
                     if (isCurrent) {
                         currentStopLatLng = point;
                         const redMarker = L.marker(point, { icon: activePinIcon })
-                            .bindPopup(`<div style="font-weight:bold; font-size:13px; color:#ffffff;">${st.seq}. ${st.name} <span style="color:#f43f5e; font-size:11px;">(當前車站)</span></div>`);
+                            .bindPopup(popupContent);
                         
                         mapMarkersGroup.addLayer(redMarker);
                         redMarker.openPopup();
                     } else {
                         const stopMarker = L.marker(point, { icon: defaultPinIcon })
-                            .bindPopup(`<div style="font-weight:bold; font-size:12px; color:#ffffff;">${st.seq}. ${st.name}</div>`);
+                            .bindPopup(popupContent);
                         
                         // 加入地圖 Marker 點擊事件監聽，實現點選地圖車站同步切換
                         stopMarker.on('click', function() {
@@ -1983,7 +2016,7 @@
 
                 chatBox.innerHTML += `
                     <div class="bg-rose-950/80 border border-rose-800 rounded-2xl p-2.5 max-w-[88%] text-xs text-rose-200 leading-relaxed">
-                        ⚠️ 提示：${err.message}
+                        ${err.message || '發生未知錯誤，請重試。'}
                     </div>
                 `;
             } finally {
