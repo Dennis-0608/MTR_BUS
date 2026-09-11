@@ -21,7 +21,7 @@
                         hkbus: '#0055A5',
                         hkmtr: '#A2238E',
                         kmb: '#e11d48',
-                        ctb: '#eab308'
+                        ctb: '#e11d48'
                     }
                 }
             }
@@ -1264,7 +1264,7 @@
                 companyTag.className = "bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
                 companyTag.textContent = "九巴 (KMB)";
             } else {
-                companyTag.className = "bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
+                companyTag.className = "bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wide shrink-0";
                 companyTag.textContent = "城巴 (CTB)";
             }
 
@@ -1561,7 +1561,7 @@
                             const isKmb = item.company === 'kmb';
                             const compBadgeClass = isKmb 
                                 ? 'bg-rose-600 text-white' 
-                                : 'bg-amber-500 text-slate-950';
+                                : 'bg-rose-600 text-white';
                             const compName = isKmb ? '九巴' : '城巴';
 
                             let timeBadge = `<span class="text-[22px] sm:text-[26px] font-black text-emerald-400">${diffMins} <span class="text-[14px] font-normal text-slate-400">分鐘</span></span>`;
@@ -1738,7 +1738,8 @@
             });
 
             if (latLngs.length > 1) {
-                const lineThemeColor = (currentActiveStop.company === 'ctb') ? '#eab308' : '#e11d48';
+                // 統一使用鮮紅色，強化手機觀看清晰度
+                const lineThemeColor = '#e11d48';
 
                 // 1. 快速先畫出基礎參考線條
                 mapPolyline = L.polyline(latLngs, {
@@ -1769,19 +1770,20 @@
                     busMap.fitBounds(mapPolyline.getBounds(), { padding: [25, 25] });
                 }
 
-                // 2. 異步載入真實道路駕駛軌跡（經專精 AI 高手防偏離算法優化）
+                // 2. 異步載入真實道路駕駛軌跡（經極致防偏離演算法優化）
                 fetchRouteRoadTrajectory(currentRouteStops, currentActiveStop.company);
             } else if (currentStopLatLng) {
                 busMap.setView(currentStopLatLng, 15);
             }
         }
 
-        // 同步城巴/九巴真實道路軌跡專用 API 函數（防偏離加強版）
+        // 同步城巴/九巴真實道路軌跡專用 API 函數（高精確度防偏離升級版）
         async function fetchRouteRoadTrajectory(stops, company) {
             const validStops = stops.filter(s => s.lat > 0 && s.long > 0);
             if (validStops.length < 2) return;
 
-            const chunkSize = 8; // 縮小批次規模，防止單點偏離拉扯後續數十個車站
+            // 縮小至 4 站一組切片，極大化減少開車導航自由繞路的空間
+            const chunkSize = 4;
             let fullRoadCoords = [];
 
             try {
@@ -1790,8 +1792,8 @@
                     if (chunk.length < 2) continue;
 
                     const locs = chunk.map(s => `${s.long},${s.lat}`).join(';');
-                    // 加入 radiuses=100m 自動吸附主幹道，配合 continue_straight=true 禁止 180 度大掉頭
-                    const radiuses = chunk.map(() => '100').join(';');
+                    // radiuses 設為 30m，強制將道路吸附在巴士站牌實體座標，防止甩向遠處主幹道
+                    const radiuses = chunk.map(() => '30').join(';');
                     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${locs}?overview=full&geometries=geojson&continue_straight=true&radiuses=${radiuses}`;
 
                     const res = await fetch(osrmUrl);
@@ -1801,7 +1803,7 @@
                             const routeData = data.routes[0];
                             const coords = routeData.geometry.coordinates; // [[lng, lat], ...]
                             
-                            // 計算該小段車站間的直線距離總和
+                            // 計算該段站點間直線距離總和
                             let directDist = 0;
                             for (let k = 0; k < chunk.length - 1; k++) {
                                 directDist += calculateDistanceMeters(chunk[k].lat, chunk[k].long, chunk[k+1].lat, chunk[k+1].long);
@@ -1809,8 +1811,8 @@
 
                             const osrmDist = routeData.distance || 0;
 
-                            // 繞路防禦機制：如果 OSRM 計算距離大於兩站直線總和 2.2 倍，代表觸發偏離繞路，降級改用直線連接
-                            if (osrmDist > 0 && directDist > 0 && osrmDist > directDist * 2.2) {
+                            // 嚴格防偏離門檻：如果計算距離超過直線 1.6 倍，代表導航迷路走錯天橋，直接回退採用站點連線
+                            if (osrmDist > 0 && directDist > 0 && osrmDist > directDist * 1.6) {
                                 const fallbackCoords = chunk.map(s => [s.lat, s.long]);
                                 if (fullRoadCoords.length > 0) fullRoadCoords.pop();
                                 fullRoadCoords = fullRoadCoords.concat(fallbackCoords);
@@ -1821,7 +1823,7 @@
                             }
                         }
                     } else {
-                        // API 失敗時降級連線
+                        // API 異常時安全備用降級
                         const fallbackCoords = chunk.map(s => [s.lat, s.long]);
                         if (fullRoadCoords.length > 0) fullRoadCoords.pop();
                         fullRoadCoords = fullRoadCoords.concat(fallbackCoords);
@@ -1834,7 +1836,8 @@
                         busMap.removeLayer(mapDecorator);
                     }
 
-                    const polyColor = (company === 'ctb') ? '#eab308' : '#e11d48';
+                    // 統一使用鮮紅色軌跡線
+                    const polyColor = '#e11d48';
 
                     mapPolyline = L.polyline(fullRoadCoords, {
                         color: polyColor,
@@ -1859,7 +1862,7 @@
                     }
                 }
             } catch (err) {
-                console.warn("無法取得真實道路軌跡，維持基礎直線預覽:", err);
+                console.warn("維持高精確度線條顯示:", err);
             }
         }
 
@@ -1921,7 +1924,7 @@
                 }
 
                 section.innerHTML = favorites.map((f, idx) => {
-                    const compBadge = f.company === 'kmb' ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1 py-0.5 rounded">九巴</span>' : '<span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1 py-0.5 rounded">城巴</span>';
+                    const compBadge = f.company === 'kmb' ? '<span class="bg-rose-600 text-white text-[9px] font-black px-1 py-0.5 rounded">九巴</span>' : '<span class="bg-rose-600 text-white text-[9px] font-black px-1 py-0.5 rounded">城巴</span>';
                     return `
                         <div onclick="loadFavoriteItem(${idx})" class="bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-xl p-1.5 min-w-[110px] max-w-[140px] cursor-pointer shrink-0 transition flex flex-col gap-0.5">
                             <div class="flex items-center justify-between">
@@ -2044,27 +2047,15 @@
         }
 
         function selectStopFromChangeModal(stopId, stopName, seq) {
-            const foundStop = currentRouteStops.find(s => s.stopId === stopId);
-            currentActiveStop.stopId = stopId;
-            currentActiveStop.stopName = stopName;
-            currentActiveStop.seq = seq;
+            selectStopAndClose(stopId, stopName, seq);
             closeChangeStopModal();
-            renderActiveStopDashboard();
-            fetchRealTimeETA();
-            updateBusMap();
-
-            if (foundStop && foundStop.lat && foundStop.long) {
-                fetchWeatherAndLocation(foundStop.lat, foundStop.long);
-            }
-
-            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchRealTimeETA, 10000);
         }
 
         function filterChangeStops() {
-            const query = document.getElementById('changeStopSearchInput').value.trim().toLowerCase();
+            const query = document.getElementById('changeStopSearchInput').value.trim().toUpperCase();
             const container = document.getElementById('changeStopListContainer');
-            const filtered = currentRouteStops.filter(s => s.name.toLowerCase().includes(query));
+            const filtered = currentRouteStops.filter(s => s.name.toUpperCase().includes(query));
+            
             container.innerHTML = filtered.map(s => `
                 <div onclick="selectStopFromChangeModal('${s.stopId}', '${s.name.replace(/'/g, "\\'")}', ${s.seq})" class="p-2 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between text-xs transition">
                     <div class="flex items-center gap-2 overflow-hidden">
