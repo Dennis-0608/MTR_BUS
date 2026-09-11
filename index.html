@@ -858,7 +858,6 @@
             if (gpsIcon) gpsIcon.className = "fa-solid fa-spinner fa-spin text-xs text-amber-400";
             let userCoords = null;
 
-            // 1. 優先嘗試獲取裝置 GPS 座標
             if ("geolocation" in navigator) {
                 try {
                     const pos = await new Promise((resolve, reject) => {
@@ -874,7 +873,6 @@
                     };
                     if (gpsIcon) gpsIcon.className = "fa-solid fa-location-dot text-xs text-emerald-400";
                 } catch (err) {
-                    // 若 GPS 被拒絕或超時，退而使用傳入的車庫/車站座標 (如有)
                     if (overrideLat && overrideLng) {
                         userCoords = { lat: overrideLat, lng: overrideLng };
                         if (gpsIcon) gpsIcon.className = "fa-solid fa-map-pin text-xs text-indigo-400";
@@ -887,18 +885,15 @@
                 if (gpsIcon) gpsIcon.className = "fa-solid fa-map-pin text-xs text-indigo-400";
             }
 
-            // 2. 獲取香港天文台即時天氣 API (rhrread Endpoint)
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
                 if (res.ok) {
                     const data = await res.json();
                     
-                    // 設定即時天氣 Icon
                     if (data.icon && data.icon.length > 0) {
                         iconEl.textContent = getHkoWeatherEmoji(data.icon[0]);
                     }
 
-                    // 取得天文台各區溫度陣列
                     const tempArr = (data.temperature && data.temperature.data) ? data.temperature.data : [];
                     let selectedStationName = "香港";
                     let matchedTemp = null;
@@ -906,7 +901,6 @@
                     if (userCoords && tempArr.length > 0) {
                         let minDistance = Infinity;
                         
-                        // 比對 32 個官方氣象站經緯度，選取距離最近且有溫度數據的站點
                         hkoStations.forEach(station => {
                             const apiData = tempArr.find(t => t.place === station.name || t.place.includes(station.name));
                             if (apiData) {
@@ -920,7 +914,6 @@
                         });
                     }
 
-                    // 若未獲取 GPS 且無傳入車站，預設讀取「京士柏」或「香港天文台」數據
                     if (matchedTemp === null) {
                         const defaultItem = tempArr.find(t => t.place === '京士柏' || t.place === '香港天文台') || tempArr[0];
                         if (defaultItem) {
@@ -935,7 +928,6 @@
                     locEl.textContent = selectedStationName;
                     tempEl.textContent = `${matchedTemp}°C`;
 
-                    // 動態設定氣象盒 Hover 提示資訊 (濕度與警告訊息)
                     let tooltipText = `地區: ${selectedStationName} (${matchedTemp}°C)`;
                     if (data.humidity && data.humidity.data && data.humidity.data.length > 0) {
                         tooltipText += ` | 相對濕度: ${data.humidity.data[0].value}%`;
@@ -954,19 +946,19 @@
 
         function getHkoWeatherEmoji(code) {
             const c = Number(code);
-            if (c === 50 || c === 77) return '☀️';           // 陽光充沛 / 晴朗
-            if (c === 51 || c === 52) return '⛅';           // 大致天晴 / 短暫陽光
-            if (c === 53 || c === 54) return '🌦️';           // 短暫陽光有幾陣驟雨
-            if (c === 60 || c === 61) return '☁️';           // 多雲 / 密雲
-            if (c === 62) return '🌧️';                       // 微雨
-            if (c === 63 || c === 64) return '🌧️';           // 有雨 / 大雨
-            if (c === 65 || c === 85) return '⛈️';           // 狂風雷暴
-            if (c >= 70 && c <= 76) return '🌙';           // 晚間天晴 / 晚間多雲
-            if (c === 80) return '🌬️';                       // 大風
-            if (c >= 81 && c <= 84) return '🌫️';           // 乾燥 / 薄霧 / 煙霞 / 霧
-            if (c === 90) return '🥵';                       // 酷熱
-            if (c === 91) return '🥶';                       // 寒冷
-            if (c >= 92 && c <= 93) return '⛈️';           // 暴雨雷暴
+            if (c === 50 || c === 77) return '☀️';           
+            if (c === 51 || c === 52) return '⛅';           
+            if (c === 53 || c === 54) return '🌦️';           
+            if (c === 60 || c === 61) return '☁️';           
+            if (c === 62) return '🌧️';                       
+            if (c === 63 || c === 64) return '🌧️';           
+            if (c === 65 || c === 85) return '⛈️';           
+            if (c >= 70 && c <= 76) return '🌙';           
+            if (c === 80) return '🌬️';                       
+            if (c >= 81 && c <= 84) return '🌫️';           
+            if (c === 90) return '🥵';                       
+            if (c === 91) return '🥶';                       
+            if (c >= 92 && c <= 93) return '⛈️';           
             return '⛅';
         }
 
@@ -1253,7 +1245,6 @@
             fetchRealTimeETA();
             updateBusMap();
 
-            // 若有座標，更新地區天氣資訊
             if (foundStop && foundStop.lat && foundStop.long) {
                 fetchWeatherAndLocation(foundStop.lat, foundStop.long);
             }
@@ -1747,10 +1738,13 @@
             });
 
             if (latLngs.length > 1) {
+                const lineThemeColor = (currentActiveStop.company === 'ctb') ? '#eab308' : '#e11d48';
+
+                // 1. 快速先畫出基礎參考線條
                 mapPolyline = L.polyline(latLngs, {
-                    color: '#e11d48',
+                    color: lineThemeColor,
                     weight: 4,
-                    opacity: 0.85
+                    opacity: 0.7
                 }).addTo(busMap);
 
                 if (typeof L.polylineDecorator === 'function') {
@@ -1774,8 +1768,76 @@
                 } else {
                     busMap.fitBounds(mapPolyline.getBounds(), { padding: [25, 25] });
                 }
+
+                // 2. 異步載入真實道路駕駛軌跡（與城巴/九巴真實路網同步）
+                fetchRouteRoadTrajectory(currentRouteStops, currentActiveStop.company);
             } else if (currentStopLatLng) {
                 busMap.setView(currentStopLatLng, 15);
+            }
+        }
+
+        // 同步城巴/九巴真實道路軌跡專用 API 函數
+        async function fetchRouteRoadTrajectory(stops, company) {
+            const validStops = stops.filter(s => s.lat > 0 && s.long > 0);
+            if (validStops.length < 2) return;
+
+            const chunkSize = 20; // 批次分組，防止 API 網址超出長度限制
+            let fullRoadCoords = [];
+
+            try {
+                for (let i = 0; i < validStops.length - 1; i += chunkSize - 1) {
+                    const chunk = validStops.slice(i, i + chunkSize);
+                    if (chunk.length < 2) continue;
+
+                    const locs = chunk.map(s => `${s.long},${s.lat}`).join(';');
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${locs}?overview=full&geometries=geojson`;
+
+                    const res = await fetch(osrmUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.routes && data.routes.length > 0) {
+                            const coords = data.routes[0].geometry.coordinates; // [[lng, lat], ...]
+                            const latLngs = coords.map(c => [c[1], c[0]]);
+                            if (fullRoadCoords.length > 0) {
+                                fullRoadCoords.pop(); // 移除重疊點
+                            }
+                            fullRoadCoords = fullRoadCoords.concat(latLngs);
+                        }
+                    }
+                }
+
+                if (fullRoadCoords.length > 1 && mapPolyline) {
+                    busMap.removeLayer(mapPolyline);
+                    if (mapDecorator) {
+                        busMap.removeLayer(mapDecorator);
+                    }
+
+                    const polyColor = (company === 'ctb') ? '#eab308' : '#e11d48';
+
+                    mapPolyline = L.polyline(fullRoadCoords, {
+                        color: polyColor,
+                        weight: 5,
+                        opacity: 0.95
+                    }).addTo(busMap);
+
+                    if (typeof L.polylineDecorator === 'function') {
+                        mapDecorator = L.polylineDecorator(mapPolyline, {
+                            patterns: [
+                                {
+                                    offset: '5%',
+                                    repeat: 40,
+                                    symbol: L.Symbol.arrowHead({
+                                        pixelSize: 8,
+                                        polygon: false,
+                                        pathOptions: { stroke: true, color: '#ffffff', weight: 2, opacity: 0.95 }
+                                    })
+                                }
+                            ]
+                        }).addTo(busMap);
+                    }
+                }
+            } catch (err) {
+                console.warn("無法取得真實道路軌跡，維持基礎直線預覽:", err);
             }
         }
 
