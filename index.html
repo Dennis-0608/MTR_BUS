@@ -1738,10 +1738,8 @@
             });
 
             if (latLngs.length > 1) {
-                // 行車軌跡統一保持鮮紅色
                 const lineThemeColor = '#e11d48';
 
-                // 1. 快速先畫出基礎參考線條
                 mapPolyline = L.polyline(latLngs, {
                     color: lineThemeColor,
                     weight: 4,
@@ -1770,14 +1768,12 @@
                     busMap.fitBounds(mapPolyline.getBounds(), { padding: [25, 25] });
                 }
 
-                // 2. 載入真實道路駕駛軌跡
                 fetchRouteRoadTrajectory(currentRouteStops, currentActiveStop.company);
             } else if (currentStopLatLng) {
                 busMap.setView(currentStopLatLng, 15);
             }
         }
 
-        // 同步真實道路軌跡 API
         async function fetchRouteRoadTrajectory(stops, company) {
             const validStops = stops.filter(s => s.lat > 0 && s.long > 0);
             if (validStops.length < 2) return;
@@ -1792,9 +1788,8 @@
 
                     const locs = chunk.map(s => `${s.long},${s.lat}`).join(';');
                     const radiuses = chunk.map(() => '30').join(';');
-                    // 替換為你的 Cloudflare Worker 網址
-const workerProxyUrl = 'https://hk-bus-router.dw7668.workers.dev/'; 
-const osrmUrl = `${workerProxyUrl}?locs=${encodeURIComponent(locs)}&radiuses=${encodeURIComponent(radiuses)}`;
+                    const workerProxyUrl = 'https://hk-bus-router.dw7668.workers.dev/'; 
+                    const osrmUrl = `${workerProxyUrl}?locs=${encodeURIComponent(locs)}&radiuses=${encodeURIComponent(radiuses)}`;
 
                     const res = await fetch(osrmUrl);
                     if (res.ok) {
@@ -1833,7 +1828,6 @@ const osrmUrl = `${workerProxyUrl}?locs=${encodeURIComponent(locs)}&radiuses=${e
                         busMap.removeLayer(mapDecorator);
                     }
 
-                    // 軌跡線條持續使用鮮紅色
                     const polyColor = '#e11d48';
 
                     mapPolyline = L.polyline(fullRoadCoords, {
@@ -2046,21 +2040,6 @@ const osrmUrl = `${workerProxyUrl}?locs=${encodeURIComponent(locs)}&radiuses=${e
         function selectStopFromChangeModal(stopId, stopName, seq) {
             closeChangeStopModal();
             selectStopAndClose(stopId, stopName, seq);
-        }
-
-        function filterChangeStops() {
-            const input = document.getElementById('changeStopSearchInput').value.trim().toLowerCase();
-            const container = document.getElementById('changeStopListContainer');
-            const filtered = currentRouteStops.filter(s => s.name.toLowerCase().includes(input));
-            container.innerHTML = filtered.map(s => `
-                <div onclick="selectStopFromChangeModal('${s.stopId}', '${s.name.replace(/'/g, "\\'")}', ${s.seq})" class="p-2 rounded-xl bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 cursor-pointer flex items-center justify-between text-xs transition">
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="w-5 h-5 rounded bg-slate-800 text-slate-300 font-bold flex items-center justify-center text-[10px] shrink-0">${s.seq}</span>
-                        <span class="font-bold ${s.stopId===currentActiveStop.stopId?'text-indigo-400':'text-slate-200'} truncate">${s.name}</span>
-                    </div>
-                    ${s.stopId===currentActiveStop.stopId?'<span class="text-[9px] bg-indigo-900 text-indigo-200 px-1.5 py-0.5 rounded">當前</span>':''}
-                </div>
-            `).join('');
         }
     </script>
 </body>
