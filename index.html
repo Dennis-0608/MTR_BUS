@@ -1769,19 +1769,19 @@
                     busMap.fitBounds(mapPolyline.getBounds(), { padding: [25, 25] });
                 }
 
-                // 2. 異步載入真實道路駕駛軌跡（與城巴/九巴真實路網同步）
+                // 2. 異步載入真實道路駕駛軌跡（經專精 AI 高手防偏離算法優化）
                 fetchRouteRoadTrajectory(currentRouteStops, currentActiveStop.company);
             } else if (currentStopLatLng) {
                 busMap.setView(currentStopLatLng, 15);
             }
         }
 
-        // 同步城巴/九巴真實道路軌跡專用 API 函數
+        // 同步城巴/九巴真實道路軌跡專用 API 函數（防偏離加強版）
         async function fetchRouteRoadTrajectory(stops, company) {
             const validStops = stops.filter(s => s.lat > 0 && s.long > 0);
             if (validStops.length < 2) return;
 
-            const chunkSize = 20; // 批次分組，防止 API 網址超出長度限制
+            const chunkSize = 8; // 縮小批次規模，防止單點偏離拉扯後續數十個車站
             let fullRoadCoords = [];
 
             try {
@@ -1790,19 +1790,41 @@
                     if (chunk.length < 2) continue;
 
                     const locs = chunk.map(s => `${s.long},${s.lat}`).join(';');
-                    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${locs}?overview=full&geometries=geojson`;
+                    // 加入 radiuses=100m 自動吸附主幹道，配合 continue_straight=true 禁止 180 度大掉頭
+                    const radiuses = chunk.map(() => '100').join(';');
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${locs}?overview=full&geometries=geojson&continue_straight=true&radiuses=${radiuses}`;
 
                     const res = await fetch(osrmUrl);
                     if (res.ok) {
                         const data = await res.json();
                         if (data.routes && data.routes.length > 0) {
-                            const coords = data.routes[0].geometry.coordinates; // [[lng, lat], ...]
-                            const latLngs = coords.map(c => [c[1], c[0]]);
-                            if (fullRoadCoords.length > 0) {
-                                fullRoadCoords.pop(); // 移除重疊點
+                            const routeData = data.routes[0];
+                            const coords = routeData.geometry.coordinates; // [[lng, lat], ...]
+                            
+                            // 計算該小段車站間的直線距離總和
+                            let directDist = 0;
+                            for (let k = 0; k < chunk.length - 1; k++) {
+                                directDist += calculateDistanceMeters(chunk[k].lat, chunk[k].long, chunk[k+1].lat, chunk[k+1].long);
                             }
-                            fullRoadCoords = fullRoadCoords.concat(latLngs);
+
+                            const osrmDist = routeData.distance || 0;
+
+                            // 繞路防禦機制：如果 OSRM 計算距離大於兩站直線總和 2.2 倍，代表觸發偏離繞路，降級改用直線連接
+                            if (osrmDist > 0 && directDist > 0 && osrmDist > directDist * 2.2) {
+                                const fallbackCoords = chunk.map(s => [s.lat, s.long]);
+                                if (fullRoadCoords.length > 0) fullRoadCoords.pop();
+                                fullRoadCoords = fullRoadCoords.concat(fallbackCoords);
+                            } else {
+                                const latLngs = coords.map(c => [c[1], c[0]]);
+                                if (fullRoadCoords.length > 0) fullRoadCoords.pop();
+                                fullRoadCoords = fullRoadCoords.concat(latLngs);
+                            }
                         }
+                    } else {
+                        // API 失敗時降級連線
+                        const fallbackCoords = chunk.map(s => [s.lat, s.long]);
+                        if (fullRoadCoords.length > 0) fullRoadCoords.pop();
+                        fullRoadCoords = fullRoadCoords.concat(fallbackCoords);
                     }
                 }
 
