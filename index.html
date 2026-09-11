@@ -1792,7 +1792,9 @@
 
                     const locs = chunk.map(s => `${s.long},${s.lat}`).join(';');
                     const radiuses = chunk.map(() => '30').join(';');
-                    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${locs}?overview=full&geometries=geojson&continue_straight=true&radiuses=${radiuses}`;
+                    // 替換為你的 Cloudflare Worker 網址
+const workerProxyUrl = 'https://hk-bus-router.dw7668.workers.dev/'; 
+const osrmUrl = `${workerProxyUrl}?locs=${encodeURIComponent(locs)}&radiuses=${encodeURIComponent(radiuses)}`;
 
                     const res = await fetch(osrmUrl);
                     if (res.ok) {
